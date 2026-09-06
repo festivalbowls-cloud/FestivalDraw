@@ -31,6 +31,14 @@ export const RinkCard: React.FC<RinkCardProps> = ({
     const isSelected = selectedPlayerId === player.id;
     const isHighlighted = isSearchMatch(player.name);
 
+    // Block styling based on position range
+    const numberBlockBadge =
+      role === 'skip'
+        ? 'bg-amber-100 text-amber-900 border-amber-300'
+        : role === 'second'
+        ? 'bg-sky-100 text-sky-900 border-sky-300'
+        : 'bg-emerald-100 text-emerald-900 border-emerald-300';
+
     return (
       <button
         type="button"
@@ -42,19 +50,24 @@ export const RinkCard: React.FC<RinkCardProps> = ({
             ? 'bg-emerald-100/80 border-emerald-500 ring-2 ring-emerald-400'
             : 'bg-white hover:bg-stone-50 border-stone-200/80'
         }`}
-        title="Click to select and swap with another bowler"
+        title={`Click to swap ${player.name} (Position: ${role.toUpperCase()})`}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <div className={`p-1 rounded-md ${badgeColor} shrink-0`}>
-            {roleIcon}
-          </div>
+          {/* Positional Number Badge */}
+          <span
+            className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs font-heading border shrink-0 ${numberBlockBadge}`}
+            title={`Bowler #${player.bowlerNumber} (${role.toUpperCase()} block)`}
+          >
+            #{player.bowlerNumber}
+          </span>
+
           <div className="min-w-0">
             <p className={`text-sm font-semibold truncate ${isSelected ? 'text-amber-950' : 'text-stone-900'}`}>
               {player.name}
             </p>
-            <p className="text-[11px] text-stone-500 font-medium tracking-wide">
-              {roleLabel}
-            </p>
+            <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-medium">
+              <span className="capitalize">{roleLabel}</span>
+            </div>
           </div>
         </div>
 

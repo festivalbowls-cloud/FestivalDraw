@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Player, BowlerPosition } from '../types';
-import { X, Users, Clipboard, RefreshCw, Check, Sparkles } from 'lucide-react';
-import { SAMPLE_BOWLER_NAMES } from '../utils/bowlsDraw';
+import { X, Users, Clipboard, RefreshCw, Check, Sparkles, Crown, Circle, Target } from 'lucide-react';
+import { POSITION_BLOCKS } from '../utils/bowlsDraw';
 
 interface PlayerListModalProps {
   isOpen: boolean;
@@ -21,18 +21,21 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
   onResetToDefault
 }) => {
   const [activeTab, setActiveTab] = useState<'roster' | 'paste'>('roster');
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'skip' | 'second' | 'lead'>('all');
   const [pasteText, setPasteText] = useState('');
   const [pasteSuccess, setPasteSuccess] = useState(false);
 
   if (!isOpen) return null;
 
+  const rinks = Math.max(1, Math.floor(playerCount / 6));
+  const countPerRole = rinks * 2;
+
+  const skips = players.filter(p => p.position === 'skip' || (p.bowlerNumber >= 1 && p.bowlerNumber < 30)).slice(0, countPerRole);
+  const seconds = players.filter(p => p.position === 'second' || (p.bowlerNumber >= 30 && p.bowlerNumber < 60)).slice(0, countPerRole);
+  const leads = players.filter(p => p.position === 'lead' || (p.bowlerNumber >= 60 && p.bowlerNumber < 90)).slice(0, countPerRole);
+
   const handleNameChange = (id: string, newName: string) => {
     const updated = players.map(p => p.id === id ? { ...p, name: newName } : p);
-    onUpdatePlayers(updated);
-  };
-
-  const handleRoleChange = (id: string, role: BowlerPosition | 'any') => {
-    const updated = players.map(p => p.id === id ? { ...p, rolePreference: role } : p);
     onUpdatePlayers(updated);
   };
 
@@ -44,13 +47,42 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
 
     if (lines.length === 0) return;
 
+    // Distribute into 3 blocks: Skips (1+), Seconds (30+), Leads (60+)
     const newPlayers: Player[] = [];
-    for (let i = 0; i < playerCount; i++) {
-      const name = lines[i] || `Player ${i + 1}`;
+
+    // First countPerRole are Skips (1+)
+    for (let i = 0; i < countPerRole; i++) {
+      const name = lines[i] || `Skip ${i + 1}`;
       newPlayers.push({
-        id: `p-${i + 1}`,
+        id: `skip-${1 + i}`,
         name,
-        rolePreference: 'any'
+        bowlerNumber: 1 + i,
+        position: 'skip',
+        rolePreference: 'skip'
+      });
+    }
+
+    // Next countPerRole are Seconds (30+)
+    for (let i = 0; i < countPerRole; i++) {
+      const name = lines[countPerRole + i] || `Second ${i + 1}`;
+      newPlayers.push({
+        id: `second-${30 + i}`,
+        name,
+        bowlerNumber: 30 + i,
+        position: 'second',
+        rolePreference: 'second'
+      });
+    }
+
+    // Next countPerRole are Leads (60+)
+    for (let i = 0; i < countPerRole; i++) {
+      const name = lines[countPerRole * 2 + i] || `Lead ${i + 1}`;
+      newPlayers.push({
+        id: `lead-${60 + i}`,
+        name,
+        bowlerNumber: 60 + i,
+        position: 'lead',
+        rolePreference: 'lead'
       });
     }
 
@@ -62,9 +94,57 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
     }, 800);
   };
 
+  const renderPlayerBlock = (
+    title: string,
+    rangeLabel: string,
+    role: BowlerPosition,
+    list: Player[],
+    badgeBg: string,
+    icon: React.ReactNode
+  ) => {
+    return (
+      <div className="space-y-2 mb-6 last:mb-0">
+        <div className="flex items-center justify-between pb-1.5 border-b border-stone-200">
+          <div className="flex items-center gap-2">
+            {icon}
+            <h3 className="font-bold text-sm text-stone-900 font-heading">
+              {title}
+            </h3>
+            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${badgeBg}`}>
+              Numbers {rangeLabel}
+            </span>
+          </div>
+          <span className="text-xs font-semibold text-stone-500">
+            {list.length} Bowlers ({list.length / 2} Rinks)
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {list.map((player) => (
+            <div
+              key={player.id}
+              className="flex items-center gap-2.5 p-2 rounded-xl bg-stone-50 border border-stone-200 hover:border-stone-300 transition"
+            >
+              <span className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs font-heading border shrink-0 ${badgeBg}`}>
+                #{player.bowlerNumber}
+              </span>
+              <input
+                type="text"
+                value={player.name}
+                onChange={(e) => handleNameChange(player.id, e.target.value)}
+                className="flex-1 min-w-0 px-2.5 py-1 text-sm bg-white border border-stone-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-emerald-600 text-stone-900 font-medium"
+                placeholder={`Bowler #${player.bowlerNumber}`}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 backdrop-blur-xs p-4 no-print">
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Modal Header */}
         <div className="bg-emerald-900 px-6 py-4 text-white flex items-center justify-between border-b border-emerald-950">
@@ -72,10 +152,10 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
             <Users className="w-5 h-5 text-amber-400" />
             <div>
               <h2 className="font-bold text-lg font-heading">
-                Bowler Roster ({playerCount} Bowlers)
+                Bowler Roster & Position Blocks
               </h2>
               <p className="text-xs text-emerald-200">
-                Customise names or paste sign-up sheet
+                Skips (1+), Seconds (30+), Leads (60+) to prevent role confusion
               </p>
             </div>
           </div>
@@ -90,46 +170,89 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
         </div>
 
         {/* Modal Navigation Tabs */}
-        <div className="flex border-b border-stone-200 bg-stone-50 px-6 pt-2 gap-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab('roster')}
-            className={`pb-2.5 text-sm font-semibold transition cursor-pointer border-b-2 ${
-              activeTab === 'roster'
-                ? 'border-emerald-700 text-emerald-900'
-                : 'border-transparent text-stone-500 hover:text-stone-800'
-            }`}
-          >
-            Current Bowlers ({playerCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('paste')}
-            className={`pb-2.5 text-sm font-semibold transition cursor-pointer border-b-2 flex items-center gap-1.5 ${
-              activeTab === 'paste'
-                ? 'border-emerald-700 text-emerald-900'
-                : 'border-transparent text-stone-500 hover:text-stone-800'
-            }`}
-          >
-            <Clipboard className="w-4 h-4" />
-            <span>Paste Names List</span>
-          </button>
+        <div className="flex flex-wrap items-center justify-between border-b border-stone-200 bg-stone-50 px-6 pt-2 gap-2">
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => setActiveTab('roster')}
+              className={`pb-2.5 text-sm font-semibold transition cursor-pointer border-b-2 ${
+                activeTab === 'roster'
+                  ? 'border-emerald-700 text-emerald-900'
+                  : 'border-transparent text-stone-500 hover:text-stone-800'
+              }`}
+            >
+              Numeric Blocks ({playerCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('paste')}
+              className={`pb-2.5 text-sm font-semibold transition cursor-pointer border-b-2 flex items-center gap-1.5 ${
+                activeTab === 'paste'
+                  ? 'border-emerald-700 text-emerald-900'
+                  : 'border-transparent text-stone-500 hover:text-stone-800'
+              }`}
+            >
+              <Clipboard className="w-4 h-4" />
+              <span>Paste Names List</span>
+            </button>
+          </div>
+
+          {activeTab === 'roster' && (
+            <div className="flex items-center gap-1 pb-2">
+              <button
+                type="button"
+                onClick={() => setSelectedFilter('all')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  selectedFilter === 'all' ? 'bg-stone-800 text-white' : 'bg-stone-200/70 text-stone-700 hover:bg-stone-200'
+                }`}
+              >
+                All Blocks
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedFilter('skip')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  selectedFilter === 'skip' ? 'bg-amber-500 text-stone-950' : 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                }`}
+              >
+                Skips (1+)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedFilter('second')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  selectedFilter === 'second' ? 'bg-sky-600 text-white' : 'bg-sky-100 text-sky-900 hover:bg-sky-200'
+                }`}
+              >
+                Seconds (30+)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedFilter('lead')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  selectedFilter === 'lead' ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-900 hover:bg-emerald-200'
+                }`}
+              >
+                Leads (60+)
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto flex-1">
           {activeTab === 'roster' ? (
             <div>
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-stone-200 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-5 pb-3 border-b border-stone-200 text-xs">
                 <span className="text-stone-600 font-medium">
-                  Positions can optionally guide the draw if preferred.
+                  Each role is locked to its numeric block to prevent players from playing the wrong position.
                 </span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => onResetToDefault(true)}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium transition cursor-pointer"
-                    title="Fill with typical club names"
+                    title="Load realistic club bowler names"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                     <span>Sample Names</span>
@@ -138,59 +261,64 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
                     type="button"
                     onClick={() => onResetToDefault(false)}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium transition cursor-pointer"
-                    title="Reset to Player 1, Player 2..."
+                    title="Reset to generic position numbers"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Player 1..N</span>
+                    <span>Reset Numbers</span>
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {players.slice(0, playerCount).map((player, index) => (
-                  <div
-                    key={player.id}
-                    className="flex items-center gap-2 p-2 rounded-xl bg-stone-50 border border-stone-200"
-                  >
-                    <span className="w-6 text-right text-xs font-bold text-stone-500 shrink-0">
-                      {index + 1}.
-                    </span>
-                    <input
-                      type="text"
-                      value={player.name}
-                      onChange={(e) => handleNameChange(player.id, e.target.value)}
-                      className="flex-1 min-w-0 px-2.5 py-1 text-sm bg-white border border-stone-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-emerald-600 text-stone-900"
-                      placeholder={`Player ${index + 1}`}
-                    />
-                    <select
-                      value={player.rolePreference || 'any'}
-                      onChange={(e) => handleRoleChange(player.id, e.target.value as BowlerPosition | 'any')}
-                      className="text-xs bg-white border border-stone-300 rounded-lg px-2 py-1 text-stone-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-600 shrink-0"
-                      title="Role preference for balanced draw"
-                    >
-                      <option value="any">Any Role</option>
-                      <option value="skip">Skip</option>
-                      <option value="second">Second</option>
-                      <option value="lead">Lead</option>
-                    </select>
-                  </div>
-                ))}
-              </div>
+              {/* Skips (1+) */}
+              {(selectedFilter === 'all' || selectedFilter === 'skip') &&
+                renderPlayerBlock(
+                  'Skips Block',
+                  '1 to 29',
+                  'skip',
+                  skips,
+                  'bg-amber-100 text-amber-950 border-amber-300',
+                  <Crown className="w-4 h-4 text-amber-600" />
+                )}
+
+              {/* Seconds (30+) */}
+              {(selectedFilter === 'all' || selectedFilter === 'second') &&
+                renderPlayerBlock(
+                  'Seconds Block',
+                  '30 to 59',
+                  'second',
+                  seconds,
+                  'bg-sky-100 text-sky-950 border-sky-300',
+                  <Circle className="w-4 h-4 text-sky-600" />
+                )}
+
+              {/* Leads (60+) */}
+              {(selectedFilter === 'all' || selectedFilter === 'lead') &&
+                renderPlayerBlock(
+                  'Leads Block',
+                  '60 to 89',
+                  'lead',
+                  leads,
+                  'bg-emerald-100 text-emerald-950 border-emerald-300',
+                  <Target className="w-4 h-4 text-emerald-600" />
+                )}
             </div>
           ) : (
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-bold text-stone-800 mb-1">
-                  Paste Bowler Names (One name per line)
+                  Paste Bowler Names List (Total {playerCount} Bowlers)
                 </label>
-                <p className="text-xs text-stone-600 mb-2">
-                  Paste a list copied from an email, WhatsApp, or spreadsheet. The first {playerCount} names will be assigned to bowlers.
-                </p>
+                <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl mb-3 text-xs text-amber-900 space-y-1">
+                  <p className="font-bold">Position Block Order:</p>
+                  <p>• First {countPerRole} names → <strong>Skips (#1 to #{countPerRole})</strong></p>
+                  <p>• Next {countPerRole} names → <strong>Seconds (#30 to #{29 + countPerRole})</strong></p>
+                  <p>• Next {countPerRole} names → <strong>Leads (#60 to #{59 + countPerRole})</strong></p>
+                </div>
                 <textarea
                   rows={10}
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
-                  placeholder={`Arthur Davies\nBetty Cooper\nColin Taylor\nDorothy Evans\n...`}
+                  placeholder={`Arthur Davies\nMargaret Bell\nBob Campbell\nBetty Cooper\n...`}
                   className="w-full p-3 font-mono text-sm border border-stone-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-600 bg-stone-50"
                 />
               </div>
@@ -207,12 +335,12 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
                   {pasteSuccess ? (
                     <>
                       <Check className="w-4 h-4 text-emerald-200" />
-                      <span>Applied!</span>
+                      <span>Applied to Blocks!</span>
                     </>
                   ) : (
                     <>
                       <Clipboard className="w-4 h-4" />
-                      <span>Apply to Draw</span>
+                      <span>Distribute to Blocks</span>
                     </>
                   )}
                 </button>
@@ -222,7 +350,12 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="bg-stone-50 px-6 py-3 border-t border-stone-200 flex items-center justify-end">
+        <div className="bg-stone-50 px-6 py-3 border-t border-stone-200 flex items-center justify-between">
+          <div className="flex items-center gap-3 text-xs text-stone-500 font-medium">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500"></span> 1+ Skips</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sky-500"></span> 30+ Seconds</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> 60+ Leads</span>
+          </div>
           <button
             type="button"
             onClick={onClose}

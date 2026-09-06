@@ -1,5 +1,5 @@
 import React from 'react';
-import { Minus, Plus, Shuffle, Dices } from 'lucide-react';
+import { ChevronDown, Shuffle, Dices, Users } from 'lucide-react';
 
 interface PlayerCountSelectorProps {
   playerCount: number;
@@ -11,7 +11,8 @@ interface PlayerCountSelectorProps {
   onToggleBalanceRoles: (enabled: boolean) => void;
 }
 
-const COMMON_PRESETS = [6, 12, 18, 24, 30, 36, 42, 48];
+// Multiples of 6 options: from 6 (1 rink) up to 72 or 96 (16 rinks)
+const MULTIPLES_OF_SIX = Array.from({ length: 16 }, (_, i) => (i + 1) * 6);
 
 export const PlayerCountSelector: React.FC<PlayerCountSelectorProps> = ({
   playerCount,
@@ -24,91 +25,58 @@ export const PlayerCountSelector: React.FC<PlayerCountSelectorProps> = ({
 }) => {
   const rinkCount = Math.max(1, Math.floor(playerCount / 6));
 
-  const handleDecrease = () => {
-    if (playerCount > 6) {
-      onCountChange(playerCount - 6);
-    }
-  };
-
-  const handleIncrease = () => {
-    if (playerCount < 96) {
-      onCountChange(playerCount + 6);
-    }
-  };
-
   return (
     <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5 sm:p-6 mb-6 no-print">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         
-        {/* Left: Player Count Controls */}
-        <div className="flex-1">
+        {/* Left: Dropdown Selection for Number of Players */}
+        <div className="flex-1 max-w-xl">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-semibold uppercase tracking-wider text-stone-500">
-              Select Number of Bowlers (Multiples of 6)
+            <label htmlFor="player-count-select" className="text-sm font-semibold uppercase tracking-wider text-stone-600 flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-emerald-700" />
+              <span>Select Number of Players</span>
             </label>
-            <span className="text-xs font-medium text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+            <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
               {rinkCount} {rinkCount === 1 ? 'Rink' : 'Rinks'} • {rinkCount * 2} Triples Teams
             </span>
           </div>
 
-          <div className="flex items-center gap-3 mt-1">
-            {/* Decrease Button */}
-            <button
-              id="decrease-players-btn"
-              type="button"
-              onClick={handleDecrease}
-              disabled={playerCount <= 6}
-              className="w-12 h-12 rounded-xl flex items-center justify-center bg-stone-100 hover:bg-stone-200 disabled:opacity-40 disabled:cursor-not-allowed text-stone-700 transition cursor-pointer border border-stone-200"
-              aria-label="Decrease by 6 players"
+          {/* Styled Native Select Dropdown */}
+          <div className="relative mt-1">
+            <select
+              id="player-count-select"
+              value={playerCount}
+              onChange={(e) => onCountChange(Number(e.target.value))}
+              className="w-full h-14 pl-4 pr-11 text-base sm:text-lg font-bold text-stone-900 bg-stone-50 hover:bg-stone-100/80 border-2 border-emerald-600 rounded-xl focus:outline-hidden focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-700 transition cursor-pointer appearance-none shadow-xs"
+              aria-label="Select number of players (multiples of 6)"
             >
-              <Minus className="w-5 h-5" />
-            </button>
-
-            {/* Display Box */}
-            <div className="flex-1 max-w-[200px] h-12 px-4 rounded-xl bg-stone-50 border-2 border-emerald-600 flex items-center justify-center gap-2">
-              <span className="text-2xl font-black font-heading text-emerald-950 tabular-nums">
-                {playerCount}
-              </span>
-              <span className="text-sm font-medium text-stone-600">
-                Bowlers
-              </span>
+              {MULTIPLES_OF_SIX.map((num) => {
+                const rinks = num / 6;
+                return (
+                  <option key={num} value={num} className="font-sans py-2 text-stone-900 font-medium">
+                    {num} Players &nbsp;({rinks} {rinks === 1 ? 'Rink' : 'Rinks'} — {rinks * 2} Teams of 3)
+                  </option>
+                );
+              })}
+            </select>
+            
+            {/* Custom dropdown chevron */}
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-emerald-800">
+              <ChevronDown className="w-6 h-6 stroke-[2.5]" />
             </div>
-
-            {/* Increase Button */}
-            <button
-              id="increase-players-btn"
-              type="button"
-              onClick={handleIncrease}
-              disabled={playerCount >= 96}
-              className="w-12 h-12 rounded-xl flex items-center justify-center bg-stone-100 hover:bg-stone-200 disabled:opacity-40 disabled:cursor-not-allowed text-stone-700 transition cursor-pointer border border-stone-200"
-              aria-label="Increase by 6 players"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
           </div>
 
-          {/* Quick Preset Buttons */}
-          <div className="flex flex-wrap items-center gap-2 mt-3">
-            <span className="text-xs text-stone-600 font-medium mr-1">Quick Select:</span>
-            {COMMON_PRESETS.map((preset) => {
-              const isSelected = preset === playerCount;
-              const rinks = preset / 6;
-              return (
-                <button
-                  key={preset}
-                  id={`preset-${preset}-btn`}
-                  type="button"
-                  onClick={() => onCountChange(preset)}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition cursor-pointer ${
-                    isSelected
-                      ? 'bg-emerald-800 text-white shadow-sm ring-2 ring-emerald-700/30'
-                      : 'bg-stone-100 text-stone-700 hover:bg-stone-200 border border-stone-200'
-                  }`}
-                >
-                  {preset} <span className="text-[10px] opacity-80 font-normal">({rinks}R)</span>
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap items-center gap-2 mt-2.5 text-xs">
+            <span className="font-semibold text-stone-600">Position Blocks:</span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 font-bold border border-amber-300">
+              Skips: 1–29
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-100 text-sky-950 font-bold border border-sky-300">
+              Seconds: 30–59
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-950 font-bold border border-emerald-300">
+              Leads: 60–89
+            </span>
           </div>
         </div>
 
@@ -120,7 +88,7 @@ export const PlayerCountSelector: React.FC<PlayerCountSelectorProps> = ({
                 type="checkbox"
                 checked={balanceRoles}
                 onChange={(e) => onToggleBalanceRoles(e.target.checked)}
-                className="w-4 h-4 rounded text-emerald-700 focus:ring-emerald-500 border-stone-300"
+                className="w-4 h-4 rounded text-emerald-700 focus:ring-emerald-500 border-stone-300 cursor-pointer"
               />
               <span>Respect role preferences if set</span>
             </label>

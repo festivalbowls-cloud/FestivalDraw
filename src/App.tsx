@@ -1,20 +1,27 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Player, Rink, BowlerPosition } from './types';
+import { Player, Rink, BowlerPosition, TournamentDraw } from './types';
 import { Header } from './components/Header';
 import { PlayerCountSelector } from './components/PlayerCountSelector';
+import { TournamentRoundSelector } from './components/TournamentRoundSelector';
 import { RinkCard } from './components/RinkCard';
 import { PlayerListModal } from './components/PlayerListModal';
 import { PrintScorecardView } from './components/PrintScorecardView';
-import { generateDefaultPlayers, executeDraw, formatDrawText } from './utils/bowlsDraw';
-import { Search, RotateCcw, X, ShieldAlert, Sparkles, CheckCircle2 } from 'lucide-react';
+import {
+  generateDefaultPlayers,
+  executeTournamentDraw,
+  formatTournamentDrawText,
+  calculateDrawMetrics
+} from './utils/bowlsDraw';
+import { Search, X, Sparkles, CheckCircle2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function App() {
   const [playerCount, setPlayerCount] = useState<number>(24);
-  const [players, setPlayers] = useState<Player[]>(() => generateDefaultPlayers(48, true));
-  const [rinks, setRinks] = useState<Rink[]>([]);
+  const [players, setPlayers] = useState<Player[]>(() => generateDefaultPlayers(24, true));
+  const [tournament, setTournament] = useState<TournamentDraw | null>(null);
+  const [activeRound, setActiveRound] = useState<number>(1); // 1, 2, 3 or 0 for All
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
-  const [balanceRoles, setBalanceRoles] = useState<boolean>(false);
+  const [balanceRoles, setBalanceRoles] = useState<boolean>(true);
   const [isPlayerModalOpen, setIsPlayerModalOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
@@ -26,6 +33,7 @@ export default function App() {
     rinkNumber: number;
     teamColor: 'red' | 'blue';
     role: 'skip' | 'second' | 'lead';
+    roundNumber: number;
   } | null>(null);
 
   const rinkCount = Math.floor(playerCount / 6);
@@ -37,19 +45,16 @@ export default function App() {
     }, 2800);
   }, []);
 
-  // Generate draw function
+  // Generate 3-round tournament draw
   const handleGenerateDraw = useCallback(() => {
     setIsDrawing(true);
     setSwapSelection(null);
 
-    // Make sure we have enough players
-    const activePlayers = players.slice(0, playerCount);
-
     setTimeout(() => {
-      const newRinks = executeDraw(activePlayers, balanceRoles);
-      setRinks(newRinks);
+      const newTournament = executeTournamentDraw(players, playerCount);
+      setTournament(newTournament);
       setIsDrawing(false);
-      showToast(`Draw generated for ${playerCount} bowlers (${rinkCount} rinks)!`);
+      showToast(`3-Round Draw generated! 100% unique teammates & opponents across all rounds.`);
 
       // Gentle celebratory confetti
       try {
@@ -62,8 +67,8 @@ export default function App() {
       } catch (e) {
         // Confetti fallback
       }
-    }, 350);
-  }, [players, playerCount, balanceRoles, rinkCount, showToast]);
+    }, 300);
+  }, [players, playerCount, showToast]);
 
   // Initial draw on mount
   useEffect(() => {
@@ -75,38 +80,40 @@ export default function App() {
     setPlayerCount(newCount);
     setSwapSelection(null);
 
-    // If needed, expand players list
-    if (newCount > players.length) {
-      const additional = generateDefaultPlayers(newCount, true);
-      setPlayers((prev) => {
-        const merged = [...prev];
-        for (let i = prev.length; i < newCount; i++) {
-          merged.push(additional[i] || { id: `p-${i + 1}`, name: `Player ${i + 1}`, rolePreference: 'any' });
-        }
-        return merged;
-      });
-    }
+    const fresh = generateDefaultPlayers(newCount, true);
+    setPlayers(fresh);
 
-    // Auto update draw
     setTimeout(() => {
-      const activePlayers = players.slice(0, newCount);
-      const newRinks = executeDraw(activePlayers, balanceRoles);
-      setRinks(newRinks);
-      showToast(`Updated to ${newCount} bowlers (${Math.floor(newCount / 6)} rinks)`);
+      const newTournament = executeTournamentDraw(fresh, newCount);
+      setTournament(newTournament);
+      showToast(`Updated to ${newCount} bowlers (${Math.floor(newCount / 6)} rinks) with 3-round schedule`);
     }, 50);
   };
 
-  // Handle swapping two players between rinks or positions
+  // Determine current active rounds to display
+  const currentRoundsToDisplay = useMemo(() => {
+    if (!tournament) return [];
+    if (activeRound === 0) {
+      return tournament.rounds;
+    }
+    const single = tournament.rounds.find(r => r.roundNumber === activeRound);
+    return single ? [single] : [];
+  }, [tournament, activeRound]);
+
+  // Handle swapping two players between rinks or positions in a round
   const handleSelectPlayer = (
     player: Player,
     rinkNumber: number,
     teamColor: 'red' | 'blue',
-    role: 'skip' | 'second' | 'lead'
+    role: 'skip' | 'second' | 'lead',
+    roundNum?: number
   ) => {
+    const effectiveRound = roundNum || (activeRound === 0 ? 1 : activeRound);
+
     if (!swapSelection) {
       // First player selected
-      setSwapSelection({ player, rinkNumber, teamColor, role });
-      showToast(`Selected ${player.name}. Now click another bowler to swap.`);
+      setSwapSelection({ player, rinkNumber, teamColor, role, roundNumber: effectiveRound });
+      showToast(`Selected #${player.bowlerNumber} ${player.name} in Round ${effectiveRound}. Now click another bowler to swap.`);
       return;
     }
 
@@ -117,38 +124,57 @@ export default function App() {
       return;
     }
 
-    // Execute swap between swapSelection and currently clicked player
-    const updatedRinks = rinks.map((r) => {
-      const rinkClone = {
-        ...r,
-        teamA: { ...r.teamA },
-        teamB: { ...r.teamB }
+    if (swapSelection.roundNumber !== effectiveRound) {
+      showToast(`Please swap bowlers within Round ${swapSelection.roundNumber} or cancel.`);
+      return;
+    }
+
+    if (!tournament) return;
+
+    // Execute swap in tournament round
+    const updatedRounds = tournament.rounds.map((round) => {
+      if (round.roundNumber !== effectiveRound) return round;
+
+      const updatedRinks = round.rinks.map((r) => {
+        const rinkClone = {
+          ...r,
+          teamA: { ...r.teamA },
+          teamB: { ...r.teamB }
+        };
+
+        const assignRole = (team: typeof rinkClone.teamA, targetRole: BowlerPosition, p: Player) => {
+          if (targetRole === 'skip') team.skip = p;
+          else if (targetRole === 'second') team.second = p;
+          else if (targetRole === 'lead') team.lead = p;
+        };
+
+        if (r.rinkNumber === swapSelection.rinkNumber) {
+          const team = swapSelection.teamColor === 'red' ? rinkClone.teamA : rinkClone.teamB;
+          assignRole(team, swapSelection.role, player);
+        }
+
+        if (r.rinkNumber === rinkNumber) {
+          const team = teamColor === 'red' ? rinkClone.teamA : rinkClone.teamB;
+          assignRole(team, role, swapSelection.player);
+        }
+
+        return rinkClone;
+      });
+
+      return {
+        ...round,
+        rinks: updatedRinks
       };
-
-      // Helper to assign role in a team
-      const assignRole = (team: typeof rinkClone.teamA, targetRole: BowlerPosition, p: Player) => {
-        if (targetRole === 'skip') team.skip = p;
-        else if (targetRole === 'second') team.second = p;
-        else if (targetRole === 'lead') team.lead = p;
-      };
-
-      // Check if this rink has slot 1
-      if (r.rinkNumber === swapSelection.rinkNumber) {
-        const team = swapSelection.teamColor === 'red' ? rinkClone.teamA : rinkClone.teamB;
-        assignRole(team, swapSelection.role, player);
-      }
-
-      // Check if this rink has slot 2
-      if (r.rinkNumber === rinkNumber) {
-        const team = teamColor === 'red' ? rinkClone.teamA : rinkClone.teamB;
-        assignRole(team, role, swapSelection.player);
-      }
-
-      return rinkClone;
     });
 
-    setRinks(updatedRinks);
-    showToast(`Swapped ${swapSelection.player.name} with ${player.name}!`);
+    const newMetrics = calculateDrawMetrics(updatedRounds, playerCount, rinkCount);
+    setTournament({
+      ...tournament,
+      rounds: updatedRounds,
+      metrics: newMetrics
+    });
+
+    showToast(`Swapped #${swapSelection.player.bowlerNumber} ${swapSelection.player.name} with #${player.bowlerNumber} ${player.name}!`);
     setSwapSelection(null);
   };
 
@@ -156,24 +182,25 @@ export default function App() {
   const handleResetToDefault = (useSampleNames: boolean) => {
     const fresh = generateDefaultPlayers(playerCount, useSampleNames);
     setPlayers(fresh);
-    const newRinks = executeDraw(fresh, balanceRoles);
-    setRinks(newRinks);
+    const newTournament = executeTournamentDraw(fresh, playerCount);
+    setTournament(newTournament);
     showToast(useSampleNames ? 'Loaded sample club bowlers' : 'Reset to Player 1..N');
   };
 
   // Update players from modal
   const handleUpdatePlayers = (updated: Player[]) => {
     setPlayers(updated);
-    const newRinks = executeDraw(updated.slice(0, playerCount), balanceRoles);
-    setRinks(newRinks);
+    const newTournament = executeTournamentDraw(updated, playerCount);
+    setTournament(newTournament);
   };
 
   // Copy draw to clipboard
   const handleCopyDraw = () => {
-    const text = formatDrawText(rinks);
+    if (!tournament) return;
+    const text = formatTournamentDrawText(tournament);
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
-      showToast('Draw copied to clipboard! Ready to paste into chat or notice.');
+      showToast('3-Round draw copied to clipboard! Ready to paste into chat or notice.');
       setTimeout(() => setCopied(false), 2000);
     });
   };
@@ -185,16 +212,20 @@ export default function App() {
 
   // Filtered rinks or search counts
   const matchingBowlersCount = useMemo(() => {
-    if (!searchQuery.trim()) return 0;
+    if (!searchQuery.trim() || !tournament) return 0;
     const q = searchQuery.toLowerCase().trim();
     let count = 0;
-    rinks.forEach((r) => {
-      [r.teamA.skip, r.teamA.second, r.teamA.lead, r.teamB.skip, r.teamB.second, r.teamB.lead].forEach((p) => {
-        if (p.name.toLowerCase().includes(q)) count++;
+    tournament.rounds.forEach((round) => {
+      round.rinks.forEach((r) => {
+        [r.teamA.skip, r.teamA.second, r.teamA.lead, r.teamB.skip, r.teamB.second, r.teamB.lead].forEach((p) => {
+          if (p.name.toLowerCase().includes(q) || String(p.bowlerNumber).includes(q)) {
+            count++;
+          }
+        });
       });
     });
     return count;
-  }, [rinks, searchQuery]);
+  }, [tournament, searchQuery]);
 
   const todayStr = useMemo(() => {
     return new Date().toLocaleDateString('en-GB', {
@@ -204,6 +235,8 @@ export default function App() {
       day: 'numeric'
     });
   }, []);
+
+  const firstRoundRinks = tournament?.rounds[0]?.rinks || [];
 
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col font-sans text-stone-900 selection:bg-emerald-200">
@@ -223,7 +256,7 @@ export default function App() {
         onPrint={handlePrint}
         onCopyDraw={handleCopyDraw}
         copied={copied}
-        hasDraw={rinks.length > 0}
+        hasDraw={tournament !== null}
       />
 
       {/* Main Container */}
@@ -235,10 +268,20 @@ export default function App() {
           onCountChange={handleCountChange}
           onGenerateDraw={handleGenerateDraw}
           isDrawing={isDrawing}
-          hasDraw={rinks.length > 0}
+          hasDraw={tournament !== null}
           balanceRoles={balanceRoles}
           onToggleBalanceRoles={(enabled) => setBalanceRoles(enabled)}
         />
+
+        {/* 3-Round Tournament Navigation & Optimization Metrics */}
+        {tournament && (
+          <TournamentRoundSelector
+            tournament={tournament}
+            activeRound={activeRound}
+            onSelectRound={setActiveRound}
+            players={players}
+          />
+        )}
 
         {/* Swap Alert Banner if a player is currently selected */}
         {swapSelection && (
@@ -249,10 +292,10 @@ export default function App() {
               </span>
               <div>
                 <p className="text-sm font-bold text-amber-950">
-                  Swapping: <span className="underline">{swapSelection.player.name}</span> (Rink {swapSelection.rinkNumber}, {swapSelection.role.toUpperCase()})
+                  Swapping: <span className="underline">{swapSelection.player.name}</span> (#{swapSelection.player.bowlerNumber} • {swapSelection.role.toUpperCase()} on Rink {swapSelection.rinkNumber} — Round {swapSelection.roundNumber})
                 </p>
                 <p className="text-xs text-amber-800">
-                  Click any other bowler on any rink to swap them, or cancel below.
+                  Click any other bowler in Round {swapSelection.roundNumber} to swap them, or cancel below.
                 </p>
               </div>
             </div>
@@ -271,13 +314,15 @@ export default function App() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 no-print">
           <div>
             <h2 className="text-xl font-bold font-heading text-stone-900 flex items-center gap-2">
-              <span>Rink Allocations</span>
+              <span>
+                {activeRound === 0 ? 'All 3 Rounds Schedule' : `Round ${activeRound} Rink Allocations`}
+              </span>
               <span className="text-xs font-medium text-stone-500 bg-stone-200 px-2.5 py-0.5 rounded-full">
                 {rinkCount} {rinkCount === 1 ? 'Rink' : 'Rinks'} • {playerCount} Bowlers
               </span>
             </h2>
             <p className="text-xs text-stone-500 mt-0.5">
-              Each rink is a Triples game: Skip, Second, Lead vs Skip, Second, Lead. Click any bowler to swap.
+              Position blocks active: <strong>Skips (1+)</strong>, <strong>Seconds (30+)</strong>, <strong>Leads (60+)</strong>. 100% unique teammates & opponents.
             </p>
           </div>
 
@@ -311,21 +356,36 @@ export default function App() {
           </div>
         </div>
 
-        {/* Rinks Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 no-print">
-          {rinks.map((rink) => (
-            <RinkCard
-              key={rink.id}
-              rink={rink}
-              selectedPlayerId={swapSelection?.player.id || null}
-              onSelectPlayer={handleSelectPlayer}
-              searchQuery={searchQuery}
-            />
-          ))}
-        </div>
+        {/* Display Current Round(s) Rinks */}
+        {currentRoundsToDisplay.map((round) => (
+          <div key={round.roundNumber} className="mb-8 no-print">
+            {activeRound === 0 && (
+              <div className="flex items-center justify-between bg-stone-200/80 px-4 py-2 rounded-xl mb-3 border border-stone-300">
+                <span className="font-bold text-stone-800 text-sm tracking-wide uppercase">
+                  Round {round.roundNumber} of 3
+                </span>
+                <span className="text-xs font-medium text-stone-600">
+                  {round.rinks.length} {round.rinks.length === 1 ? 'Rink' : 'Rinks'}
+                </span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {round.rinks.map((rink) => (
+                <RinkCard
+                  key={rink.id}
+                  rink={rink}
+                  selectedPlayerId={swapSelection?.player.id || null}
+                  onSelectPlayer={(p, rNum, color, role) => handleSelectPlayer(p, rNum, color, role, round.roundNumber)}
+                  searchQuery={searchQuery}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
 
         {/* Empty state safeguard */}
-        {rinks.length === 0 && (
+        {(!tournament || tournament.rounds.length === 0) && (
           <div className="text-center py-16 bg-white rounded-2xl border border-stone-200 p-8 shadow-xs">
             <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3">
               <Sparkles className="w-8 h-8" />
@@ -338,14 +398,16 @@ export default function App() {
               onClick={handleGenerateDraw}
               className="px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm"
             >
-              Generate Draw Now
+              Generate 3-Round Draw
             </button>
           </div>
         )}
 
         {/* Print-only View (rendered when user prints) */}
         <PrintScorecardView
-          rinks={rinks}
+          rinks={firstRoundRinks}
+          tournament={tournament}
+          activeRound={activeRound}
           playerCount={playerCount}
           dateStr={todayStr}
         />
@@ -356,7 +418,7 @@ export default function App() {
       <footer className="bg-stone-50 border-t border-stone-200 py-4 px-6 text-center text-xs text-stone-500 no-print">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>Lawn Bowls Triples Rink Draw • Multiples of 6 Players</span>
-          <span className="text-stone-600">Standard Club Triples: Lead, Second, Skip</span>
+          <span className="text-stone-600">3-Round Optimization: 100% Unique Teammates & Positional Matchups</span>
         </div>
       </footer>
 

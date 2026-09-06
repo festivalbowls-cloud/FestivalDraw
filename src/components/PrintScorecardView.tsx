@@ -1,109 +1,140 @@
 import React from 'react';
-import { Rink } from '../types';
+import { Rink, TournamentDraw } from '../types';
 
 interface PrintScorecardViewProps {
   rinks: Rink[];
+  tournament: TournamentDraw | null;
+  activeRound: number; // 1, 2, 3 or 0 for all
   playerCount: number;
   dateStr: string;
 }
 
 export const PrintScorecardView: React.FC<PrintScorecardViewProps> = ({
   rinks,
+  tournament,
+  activeRound,
   playerCount,
   dateStr
 }) => {
-  if (!rinks || rinks.length === 0) return null;
+  const displayRounds = tournament
+    ? activeRound === 0
+      ? tournament.rounds
+      : tournament.rounds.filter(r => r.roundNumber === activeRound)
+    : [{ roundNumber: 1, rinks }];
+
+  if (displayRounds.length === 0 || !displayRounds[0].rinks.length) return null;
 
   return (
-    <div className="hidden print:block text-black bg-white p-6 max-w-5xl mx-auto">
+    <div className="hidden print:block text-black bg-white p-6 max-w-5xl mx-auto font-sans">
       {/* Printable Sheet Header */}
       <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-black uppercase tracking-wide">
-            Lawn Bowls Rink Draw — Triples
+            Lawn Bowls 3-Round Tournament Draw
           </h1>
           <p className="text-sm font-semibold text-neutral-800">
-            Official Club Match Sheet • {playerCount} Bowlers ({rinks.length} {rinks.length === 1 ? 'Rink' : 'Rinks'})
+            {playerCount} Bowlers ({tournament?.rinkCount || rinks.length} Rinks • Triples) • Blocks: Skips 1+, Seconds 30+, Leads 60+
           </p>
+          {tournament && (
+            <p className="text-xs text-neutral-600 mt-0.5">
+              100% Unique Teammates • 100% Unique Positional Opponents • Optimized Rink Rotation
+            </p>
+          )}
         </div>
         <div className="text-right text-xs font-mono">
           <p>Date: {dateStr}</p>
-          <p>Format: Triples (3 bowls / 2 bowls)</p>
+          <p>Schedule: {activeRound === 0 ? 'All 3 Rounds' : `Round ${activeRound} of 3`}</p>
         </div>
       </div>
 
-      {/* Grid of Rinks for Noticeboard */}
-      <div className="grid grid-cols-2 gap-6">
-        {rinks.map((rink) => (
-          <div
-            key={rink.id}
-            className="border-2 border-black rounded-lg p-3 page-break-avoid"
-          >
-            <div className="bg-neutral-200 border-b-2 border-black -mx-3 -mt-3 p-2 flex justify-between items-center mb-3">
-              <span className="font-black text-lg">RINK {rink.rinkNumber}</span>
-              <span className="text-xs font-bold uppercase tracking-wider">
-                Triples Match
+      {/* Rounds Container */}
+      <div className="space-y-8">
+        {displayRounds.map((round) => (
+          <div key={round.roundNumber} className="border-t-2 border-dashed border-neutral-300 pt-4 first:border-t-0 first:pt-0">
+            <div className="bg-neutral-100 border border-neutral-300 rounded px-3 py-1.5 mb-4 flex justify-between items-center">
+              <span className="font-black text-base uppercase tracking-wider">
+                ROUND {round.roundNumber} OF 3
+              </span>
+              <span className="text-xs font-mono text-neutral-600">
+                {round.rinks.length} Rinks in Play
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              {/* Red Team */}
-              <div className="border border-neutral-400 rounded p-2">
-                <div className="font-black text-xs uppercase border-b border-neutral-300 pb-1 mb-1.5 flex justify-between">
-                  <span>RED (Mat End 1)</span>
-                  <span>Score: ___</span>
-                </div>
-                <div className="space-y-1">
-                  <div>
-                    <span className="font-semibold text-[10px] text-neutral-600 block">SKIP:</span>
-                    <span className="font-bold text-sm">{rink.teamA.skip.name}</span>
+            {/* Grid of Rinks for Noticeboard */}
+            <div className="grid grid-cols-2 gap-4">
+              {round.rinks.map((rink) => (
+                <div
+                  key={rink.id}
+                  className="border-2 border-black rounded-lg p-2.5 page-break-avoid"
+                >
+                  <div className="bg-neutral-200 border-b border-black -mx-2.5 -mt-2.5 p-1.5 flex justify-between items-center mb-2">
+                    <span className="font-black text-sm">RINK {rink.rinkNumber}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                      Triples Match
+                    </span>
                   </div>
-                  <div>
-                    <span className="font-semibold text-[10px] text-neutral-600 block">SECOND:</span>
-                    <span className="font-bold text-sm">{rink.teamA.second.name}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-[10px] text-neutral-600 block">LEAD:</span>
-                    <span className="font-bold text-sm">{rink.teamA.lead.name}</span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Blue Team */}
-              <div className="border border-neutral-400 rounded p-2">
-                <div className="font-black text-xs uppercase border-b border-neutral-300 pb-1 mb-1.5 flex justify-between">
-                  <span>BLUE TEAM</span>
-                  <span>Score: ___</span>
-                </div>
-                <div className="space-y-1">
-                  <div>
-                    <span className="font-semibold text-[10px] text-neutral-600 block">SKIP:</span>
-                    <span className="font-bold text-sm">{rink.teamB.skip.name}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-[10px] text-neutral-600 block">SECOND:</span>
-                    <span className="font-bold text-sm">{rink.teamB.second.name}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-[10px] text-neutral-600 block">LEAD:</span>
-                    <span className="font-bold text-sm">{rink.teamB.lead.name}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {/* Red Team */}
+                    <div className="border border-neutral-400 rounded p-1.5">
+                      <div className="font-black text-[11px] uppercase border-b border-neutral-300 pb-1 mb-1 flex justify-between">
+                        <span>RED</span>
+                        <span>Score: ___</span>
+                      </div>
+                      <div className="space-y-0.5 text-[11px]">
+                        <div>
+                          <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">SKIP (1+):</span>
+                          <span className="font-bold leading-tight">#{rink.teamA.skip.bowlerNumber} {rink.teamA.skip.name}</span>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">SECOND (30+):</span>
+                          <span className="font-bold leading-tight">#{rink.teamA.second.bowlerNumber} {rink.teamA.second.name}</span>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">LEAD (60+):</span>
+                          <span className="font-bold leading-tight">#{rink.teamA.lead.bowlerNumber} {rink.teamA.lead.name}</span>
+                        </div>
+                      </div>
+                    </div>
 
-            {/* Scorecard row for writing ends */}
-            <div className="mt-3 pt-2 border-t border-dashed border-neutral-400 flex justify-between text-[11px] font-mono">
-              <span>Ends Played: [  ]</span>
-              <span>Winner: [ RED / BLUE ]</span>
-              <span>Signature: ________________</span>
+                    {/* Blue Team */}
+                    <div className="border border-neutral-400 rounded p-1.5">
+                      <div className="font-black text-[11px] uppercase border-b border-neutral-300 pb-1 mb-1 flex justify-between">
+                        <span>BLUE</span>
+                        <span>Score: ___</span>
+                      </div>
+                      <div className="space-y-0.5 text-[11px]">
+                        <div>
+                          <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">SKIP (1+):</span>
+                          <span className="font-bold leading-tight">#{rink.teamB.skip.bowlerNumber} {rink.teamB.skip.name}</span>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">SECOND (30+):</span>
+                          <span className="font-bold leading-tight">#{rink.teamB.second.bowlerNumber} {rink.teamB.second.name}</span>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">LEAD (60+):</span>
+                          <span className="font-bold leading-tight">#{rink.teamB.lead.bowlerNumber} {rink.teamB.lead.name}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Scorecard row for writing ends */}
+                  <div className="mt-2 pt-1 border-t border-dashed border-neutral-400 flex justify-between text-[10px] font-mono">
+                    <span>Ends: [  ]</span>
+                    <span>Winner: [ RED / BLUE ]</span>
+                    <span>Sign: ____________</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ))}
       </div>
 
       <div className="mt-8 pt-4 border-t border-neutral-300 text-center text-xs text-neutral-600 font-mono">
-        Generated by Lawn Bowls Draw App • Please return completed scorecards to the match secretary.
+        Generated by Lawn Bowls Draw App • Return completed cards to match secretary.
       </div>
     </div>
   );
