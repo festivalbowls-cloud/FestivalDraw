@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #f6f8f5;
+    color: #1b2e20;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  h1, h2, h3, .font-heading {
+    font-family: 'Outfit', sans-serif;
+  }
+
+  .font-display {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .page-break-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Lawn Bowls Draw",
+  "description": "A simple and intuitive lawn bowls rink draw manager for triples games in multiples of 6 players.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
