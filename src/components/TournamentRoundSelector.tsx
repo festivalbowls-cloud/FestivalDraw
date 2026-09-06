@@ -1,24 +1,53 @@
 import React, { useState } from 'react';
 import { TournamentDraw, Player } from '../types';
-import { Award, CheckCircle2, Shuffle, Calendar, UserCheck, ChevronDown, ChevronUp, Layers } from 'lucide-react';
+import { Award, CheckCircle2, Calendar, UserCheck, ChevronDown, ChevronUp, Layers, Table, FileSpreadsheet } from 'lucide-react';
 
 interface TournamentRoundSelectorProps {
   tournament: TournamentDraw | null;
   activeRound: number; // 1, 2, 3 or 0 for "all"
   onSelectRound: (round: number) => void;
   players: Player[];
+  viewMode?: 'rinks' | 'flat' | 'scorecards';
+  onSelectViewMode?: (mode: 'rinks' | 'flat' | 'scorecards') => void;
+  isFlatDraw?: boolean;
+  onToggleFlatDraw?: () => void;
+  isScorecards?: boolean;
+  onToggleScorecards?: () => void;
 }
 
 export const TournamentRoundSelector: React.FC<TournamentRoundSelectorProps> = ({
   tournament,
   activeRound,
   onSelectRound,
-  players
+  players,
+  viewMode = 'rinks',
+  onSelectViewMode,
+  isFlatDraw,
+  onToggleFlatDraw,
+  isScorecards,
+  onToggleScorecards
 }) => {
   const [showBowlerSchedule, setShowBowlerSchedule] = useState(false);
   const [selectedBowlerId, setSelectedBowlerId] = useState<string>('');
 
   if (!tournament) return null;
+
+  const currentMode = isScorecards ? 'scorecards' : isFlatDraw ? 'flat' : viewMode;
+
+  const handleModeChange = (mode: 'rinks' | 'flat' | 'scorecards') => {
+    if (onSelectViewMode) {
+      onSelectViewMode(mode);
+      return;
+    }
+    if (mode === 'rinks') {
+      if (isFlatDraw && onToggleFlatDraw) onToggleFlatDraw();
+      if (isScorecards && onToggleScorecards) onToggleScorecards();
+    } else if (mode === 'flat') {
+      if (!isFlatDraw && onToggleFlatDraw) onToggleFlatDraw();
+    } else if (mode === 'scorecards') {
+      if (!isScorecards && onToggleScorecards) onToggleScorecards();
+    }
+  };
 
   const { metrics, rounds, rinkCount } = tournament;
 
@@ -73,45 +102,103 @@ export const TournamentRoundSelector: React.FC<TournamentRoundSelectorProps> = (
       {/* Top Banner: Round Navigation Tabs + Optimization Metrics */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-stone-100 pb-4 mb-4">
         
-        {/* Left: Round Buttons */}
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-600 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-emerald-700" />
-              <span>3-Round Tournament View</span>
-            </span>
-          </div>
+        {/* Left: View Mode Tabs and Round Filter */}
+        <div className="w-full lg:w-auto">
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-stone-600 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Tournament Views</span>
+              </span>
+            </div>
 
-          <div className="inline-flex p-1 bg-stone-100 rounded-xl gap-1">
-            {[1, 2, 3].map((roundNum) => (
+            {/* Primary View Switcher: 3 columns on mobile (fits 100%), inline-flex on desktop */}
+            <div className="grid grid-cols-3 sm:inline-flex p-1 bg-stone-100 rounded-xl gap-1 w-full sm:w-auto">
               <button
-                key={roundNum}
                 type="button"
-                id={`round-tab-${roundNum}`}
-                onClick={() => onSelectRound(roundNum)}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                  activeRound === roundNum
+                id="toggle-rinks-tab"
+                onClick={() => handleModeChange('rinks')}
+                className={`py-2 px-2.5 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  currentMode === 'rinks'
                     ? 'bg-emerald-700 text-white shadow-xs'
                     : 'text-stone-700 hover:text-stone-900 hover:bg-stone-200/70'
                 }`}
               >
-                <span>Round {roundNum}</span>
+                <Layers className="w-4 h-4 shrink-0" />
+                <span>Rinks</span>
               </button>
-            ))}
 
-            <button
-              type="button"
-              id="round-tab-all"
-              onClick={() => onSelectRound(0)}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                activeRound === 0
-                  ? 'bg-emerald-700 text-white shadow-xs'
-                  : 'text-stone-700 hover:text-stone-900 hover:bg-stone-200/70'
-              }`}
-            >
-              <Layers className="w-4 h-4" />
-              <span>All 3 Rounds</span>
-            </button>
+              <button
+                type="button"
+                id="toggle-flat-draw-tab"
+                onClick={() => handleModeChange('flat')}
+                className={`py-2 px-2.5 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  currentMode === 'flat'
+                    ? 'bg-amber-400 text-emerald-950 font-black shadow-xs'
+                    : 'text-stone-700 hover:text-stone-900 hover:bg-stone-200/70'
+                }`}
+                title="Display flat draw isolating each individual player on separate rows"
+              >
+                <Table className="w-4 h-4 shrink-0 text-amber-700" />
+                <span>Flat Draw</span>
+              </button>
+
+              <button
+                type="button"
+                id="toggle-scorecards-tab"
+                onClick={() => handleModeChange('scorecards')}
+                className={`py-2 px-2.5 sm:px-4 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  currentMode === 'scorecards'
+                    ? 'bg-amber-400 text-emerald-950 font-black shadow-xs'
+                    : 'text-stone-700 hover:text-stone-900 hover:bg-stone-200/70'
+                }`}
+                title="Display player scorecards grouped dynamically by player number with Result, Ends, Points tracking"
+              >
+                <FileSpreadsheet className="w-4 h-4 shrink-0 text-emerald-700" />
+                <span>Scorecards</span>
+              </button>
+            </div>
+
+            {/* If in Rinks view: Show Round filter directly below */}
+            {currentMode === 'rinks' && (
+              <div className="pt-1">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
+                    Select Round:
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 sm:inline-flex p-1 bg-stone-50 border border-stone-200 rounded-xl gap-1 w-full sm:w-auto">
+                  {[1, 2, 3].map((roundNum) => (
+                    <button
+                      key={roundNum}
+                      type="button"
+                      id={`round-tab-${roundNum}`}
+                      onClick={() => onSelectRound(roundNum)}
+                      className={`py-1.5 px-2 sm:px-3 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer text-center ${
+                        activeRound === roundNum
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'text-stone-700 hover:text-stone-900 hover:bg-stone-200/70'
+                      }`}
+                    >
+                      <span>Round {roundNum}</span>
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    id="round-tab-all"
+                    onClick={() => onSelectRound(0)}
+                    className={`py-1.5 px-2 sm:px-3 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer text-center ${
+                      activeRound === 0
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'text-stone-700 hover:text-stone-900 hover:bg-stone-200/70'
+                    }`}
+                  >
+                    <span>All 3</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

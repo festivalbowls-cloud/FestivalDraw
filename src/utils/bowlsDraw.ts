@@ -536,3 +536,45 @@ export function formatDrawText(rinks: Rink[]): string {
   text += `Good bowling everyone! May the jack roll true.`;
   return text;
 }
+
+export function formatFlatDrawText(tournament: TournamentDraw, players: Player[]): string {
+  let text = `=== LAWN BOWLS FLAT DRAW (PLAYER NUMBERS) ===\n`;
+  text += `Total Bowlers: ${tournament.playerCount} (${tournament.rinkCount} Rinks • Triples)\n`;
+  text += `Matches Grouped Chronologically: Round & Rink | Team Numbers (Player + Teammates) | Opposition Numbers\n`;
+  text += `Blocks: Skips (1+), Seconds (30+), Leads (60+)\n\n`;
+
+  const sorted = [...players].sort((a, b) => a.bowlerNumber - b.bowlerNumber);
+
+  sorted.forEach((player) => {
+    text += `Player ${player.bowlerNumber} (${player.position.toUpperCase()} - ${player.name}):\n`;
+
+    tournament.rounds.forEach((round) => {
+      let foundRink = 1;
+      let teamNums: number[] = [];
+      let oppNums: number[] = [];
+
+      round.rinks.forEach((r) => {
+        const teamA = [r.teamA.skip, r.teamA.second, r.teamA.lead];
+        const teamB = [r.teamB.skip, r.teamB.second, r.teamB.lead];
+
+        if (teamA.some((p) => p.bowlerNumber === player.bowlerNumber)) {
+          foundRink = r.rinkNumber;
+          teamNums = teamA.map((p) => p.bowlerNumber).sort((a, b) => a - b);
+          oppNums = teamB.map((p) => p.bowlerNumber).sort((a, b) => a - b);
+        } else if (teamB.some((p) => p.bowlerNumber === player.bowlerNumber)) {
+          foundRink = r.rinkNumber;
+          teamNums = teamB.map((p) => p.bowlerNumber).sort((a, b) => a - b);
+          oppNums = teamA.map((p) => p.bowlerNumber).sort((a, b) => a - b);
+        }
+      });
+
+      const teamStr = teamNums.join(', ');
+      const oppStr = oppNums.join(', ');
+      text += `  Round ${round.roundNumber}. Rink ${foundRink} | Team: [${teamStr}] | Opposition: [${oppStr}]\n`;
+    });
+
+    text += `\n`;
+  });
+
+  return text;
+}

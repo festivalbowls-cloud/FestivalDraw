@@ -4,28 +4,33 @@ import { Header } from './components/Header';
 import { PlayerCountSelector } from './components/PlayerCountSelector';
 import { TournamentRoundSelector } from './components/TournamentRoundSelector';
 import { RinkCard } from './components/RinkCard';
+import { FlatDrawView } from './components/FlatDrawView';
+import { PlayerScorecardsView } from './components/PlayerScorecardsView';
 import { PlayerListModal } from './components/PlayerListModal';
 import { PrintScorecardView } from './components/PrintScorecardView';
 import {
   generateDefaultPlayers,
   executeTournamentDraw,
   formatTournamentDrawText,
+  formatFlatDrawText,
   calculateDrawMetrics
 } from './utils/bowlsDraw';
-import { Search, X, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Search, X, Sparkles, CheckCircle2, Layers, Table, FileSpreadsheet } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function App() {
   const [playerCount, setPlayerCount] = useState<number>(24);
   const [players, setPlayers] = useState<Player[]>(() => generateDefaultPlayers(24, true));
-  const [tournament, setTournament] = useState<TournamentDraw | null>(null);
+  const [tournament, setTournament] = useState<TournamentDraw | null>(() => executeTournamentDraw(generateDefaultPlayers(24, true), 24));
   const [activeRound, setActiveRound] = useState<number>(1); // 1, 2, 3 or 0 for All
+  const [viewMode, setViewMode] = useState<'rinks' | 'flat' | 'scorecards'>('rinks');
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [balanceRoles, setBalanceRoles] = useState<boolean>(true);
   const [isPlayerModalOpen, setIsPlayerModalOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isScorecardsPrintPreviewOpen, setIsScorecardsPrintPreviewOpen] = useState<boolean>(false);
 
   // Selected player for swapping
   const [swapSelection, setSwapSelection] = useState<{
@@ -207,7 +212,11 @@ export default function App() {
 
   // Print sheet
   const handlePrint = () => {
-    window.print();
+    if (viewMode === 'scorecards') {
+      setIsScorecardsPrintPreviewOpen(true);
+    } else {
+      window.print();
+    }
   };
 
   // Filtered rinks or search counts
@@ -257,10 +266,16 @@ export default function App() {
         onCopyDraw={handleCopyDraw}
         copied={copied}
         hasDraw={tournament !== null}
+        viewMode={viewMode}
+        onSelectViewMode={(mode) => setViewMode(mode)}
+        isFlatDraw={viewMode === 'flat'}
+        onToggleFlatDraw={() => setViewMode((prev) => (prev === 'flat' ? 'rinks' : 'flat'))}
+        isScorecards={viewMode === 'scorecards'}
+        onToggleScorecards={() => setViewMode((prev) => (prev === 'scorecards' ? 'rinks' : 'scorecards'))}
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 sm:pb-8">
         
         {/* Selector Section: Player Count (Multiples of 6) */}
         <PlayerCountSelector
@@ -278,111 +293,142 @@ export default function App() {
           <TournamentRoundSelector
             tournament={tournament}
             activeRound={activeRound}
-            onSelectRound={setActiveRound}
+            onSelectRound={(r) => {
+              setActiveRound(r);
+              setViewMode('rinks');
+            }}
             players={players}
+            viewMode={viewMode}
+            onSelectViewMode={(mode) => setViewMode(mode)}
+            isFlatDraw={viewMode === 'flat'}
+            onToggleFlatDraw={() => setViewMode((prev) => (prev === 'flat' ? 'rinks' : 'flat'))}
+            isScorecards={viewMode === 'scorecards'}
+            onToggleScorecards={() => setViewMode((prev) => (prev === 'scorecards' ? 'rinks' : 'scorecards'))}
           />
         )}
 
-        {/* Swap Alert Banner if a player is currently selected */}
-        {swapSelection && (
-          <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-300 flex items-center justify-between shadow-xs no-print animate-in fade-in">
-            <div className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center font-bold text-sm">
-                ⇄
-              </span>
-              <div>
-                <p className="text-sm font-bold text-amber-950">
-                  Swapping: <span className="underline">{swapSelection.player.name}</span> (#{swapSelection.player.bowlerNumber} • {swapSelection.role.toUpperCase()} on Rink {swapSelection.rinkNumber} — Round {swapSelection.roundNumber})
-                </p>
-                <p className="text-xs text-amber-800">
-                  Click any other bowler in Round {swapSelection.roundNumber} to swap them, or cancel below.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSwapSelection(null)}
-              className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-200/80 hover:bg-amber-300 text-amber-900 transition cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span>Cancel Swap</span>
-            </button>
-          </div>
-        )}
-
-        {/* Search / Filter Bar & Draw Details Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 no-print">
-          <div>
-            <h2 className="text-xl font-bold font-heading text-stone-900 flex items-center gap-2">
-              <span>
-                {activeRound === 0 ? 'All 3 Rounds Schedule' : `Round ${activeRound} Rink Allocations`}
-              </span>
-              <span className="text-xs font-medium text-stone-500 bg-stone-200 px-2.5 py-0.5 rounded-full">
-                {rinkCount} {rinkCount === 1 ? 'Rink' : 'Rinks'} • {playerCount} Bowlers
-              </span>
-            </h2>
-            <p className="text-xs text-stone-500 mt-0.5">
-              Position blocks active: <strong>Skips (1+)</strong>, <strong>Seconds (30+)</strong>, <strong>Leads (60+)</strong>. 100% unique teammates & opponents.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-              <input
-                id="search-bowler-input"
-                type="text"
-                placeholder="Find a bowler..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-8 py-1.5 text-xs bg-white border border-stone-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-600 text-stone-900 w-48 sm:w-56"
-              />
-              {searchQuery && (
+        {/* View Mode: Flat Draw View */}
+        {tournament && viewMode === 'flat' ? (
+          <FlatDrawView
+            tournament={tournament}
+            players={players}
+            onBackToRinks={() => setViewMode('rinks')}
+            onGoToScorecards={() => setViewMode('scorecards')}
+            onPrint={handlePrint}
+          />
+        ) : tournament && viewMode === 'scorecards' ? (
+          <PlayerScorecardsView
+            tournament={tournament}
+            players={players}
+            onBackToRinks={() => setViewMode('rinks')}
+            onGoToFlatDraw={() => setViewMode('flat')}
+            isPrintPreviewOpen={isScorecardsPrintPreviewOpen}
+            onTogglePrintPreview={setIsScorecardsPrintPreviewOpen}
+          />
+        ) : (
+          <>
+            {/* Swap Alert Banner if a player is currently selected */}
+            {swapSelection && (
+              <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-300 flex items-center justify-between shadow-xs no-print animate-in fade-in">
+                <div className="flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center font-bold text-sm">
+                    ⇄
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-amber-950">
+                      Swapping: <span className="underline">{swapSelection.player.name}</span> (#{swapSelection.player.bowlerNumber} • {swapSelection.role.toUpperCase()} on Rink {swapSelection.rinkNumber} — Round {swapSelection.roundNumber})
+                    </p>
+                    <p className="text-xs text-amber-800">
+                      Click any other bowler in Round {swapSelection.roundNumber} to swap them, or cancel below.
+                    </p>
+                  </div>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer"
+                  onClick={() => setSwapSelection(null)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-200/80 hover:bg-amber-300 text-amber-900 transition cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
+                  <span>Cancel Swap</span>
                 </button>
-              )}
-            </div>
-
-            {searchQuery && (
-              <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-1 rounded-lg">
-                {matchingBowlersCount} found
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Display Current Round(s) Rinks */}
-        {currentRoundsToDisplay.map((round) => (
-          <div key={round.roundNumber} className="mb-8 no-print">
-            {activeRound === 0 && (
-              <div className="flex items-center justify-between bg-stone-200/80 px-4 py-2 rounded-xl mb-3 border border-stone-300">
-                <span className="font-bold text-stone-800 text-sm tracking-wide uppercase">
-                  Round {round.roundNumber} of 3
-                </span>
-                <span className="text-xs font-medium text-stone-600">
-                  {round.rinks.length} {round.rinks.length === 1 ? 'Rink' : 'Rinks'}
-                </span>
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {round.rinks.map((rink) => (
-                <RinkCard
-                  key={rink.id}
-                  rink={rink}
-                  selectedPlayerId={swapSelection?.player.id || null}
-                  onSelectPlayer={(p, rNum, color, role) => handleSelectPlayer(p, rNum, color, role, round.roundNumber)}
-                  searchQuery={searchQuery}
-                />
-              ))}
+            {/* Search / Filter Bar & Draw Details Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 no-print">
+              <div>
+                <h2 className="text-xl font-bold font-heading text-stone-900 flex items-center gap-2">
+                  <span>
+                    {activeRound === 0 ? 'All 3 Rounds Schedule' : `Round ${activeRound} Rink Allocations`}
+                  </span>
+                  <span className="text-xs font-medium text-stone-500 bg-stone-200 px-2.5 py-0.5 rounded-full">
+                    {rinkCount} {rinkCount === 1 ? 'Rink' : 'Rinks'} • {playerCount} Bowlers
+                  </span>
+                </h2>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Position blocks active: <strong>Skips (1+)</strong>, <strong>Seconds (30+)</strong>, <strong>Leads (60+)</strong>. 100% unique teammates & opponents.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    id="search-bowler-input"
+                    type="text"
+                    placeholder="Find a bowler..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 pr-8 py-1.5 text-xs bg-white border border-stone-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-600 text-stone-900 w-48 sm:w-56"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {searchQuery && (
+                  <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-1 rounded-lg">
+                    {matchingBowlersCount} found
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+
+            {/* Display Current Round(s) Rinks */}
+            {currentRoundsToDisplay.map((round) => (
+              <div key={round.roundNumber} className="mb-8 no-print">
+                {activeRound === 0 && (
+                  <div className="flex items-center justify-between bg-stone-200/80 px-4 py-2 rounded-xl mb-3 border border-stone-300">
+                    <span className="font-bold text-stone-800 text-sm tracking-wide uppercase">
+                      Round {round.roundNumber} of 3
+                    </span>
+                    <span className="text-xs font-medium text-stone-600">
+                      {round.rinks.length} {round.rinks.length === 1 ? 'Rink' : 'Rinks'}
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {round.rinks.map((rink) => (
+                    <RinkCard
+                      key={rink.id}
+                      rink={rink}
+                      selectedPlayerId={swapSelection?.player.id || null}
+                      onSelectPlayer={(p, rNum, color, role) => handleSelectPlayer(p, rNum, color, role, round.roundNumber)}
+                      searchQuery={searchQuery}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
 
         {/* Empty state safeguard */}
         {(!tournament || tournament.rounds.length === 0) && (
@@ -403,14 +449,16 @@ export default function App() {
           </div>
         )}
 
-        {/* Print-only View (rendered when user prints) */}
-        <PrintScorecardView
-          rinks={firstRoundRinks}
-          tournament={tournament}
-          activeRound={activeRound}
-          playerCount={playerCount}
-          dateStr={todayStr}
-        />
+        {/* Print-only View (rendered when user prints in rink cards mode) */}
+        {viewMode === 'rinks' && (
+          <PrintScorecardView
+            rinks={firstRoundRinks}
+            tournament={tournament}
+            activeRound={activeRound}
+            playerCount={playerCount}
+            dateStr={todayStr}
+          />
+        )}
 
       </main>
 
@@ -431,6 +479,54 @@ export default function App() {
         onUpdatePlayers={handleUpdatePlayers}
         onResetToDefault={handleResetToDefault}
       />
+
+      {/* Mobile Fixed Bottom Navigation Bar (Phone Only) */}
+      <nav
+        aria-label="Mobile Navigation"
+        className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-stone-300 shadow-2xl px-3 py-2 sm:hidden flex items-center justify-around no-print"
+      >
+        <button
+          type="button"
+          id="mobile-bottom-nav-rinks"
+          onClick={() => setViewMode('rinks')}
+          className={`flex flex-col items-center justify-center flex-1 py-1.5 px-2 rounded-xl transition cursor-pointer ${
+            viewMode === 'rinks'
+              ? 'text-emerald-900 font-bold bg-emerald-100 ring-1 ring-emerald-300 shadow-xs'
+              : 'text-stone-600 font-medium hover:text-stone-900'
+          }`}
+        >
+          <Layers className="w-5 h-5 mb-0.5" />
+          <span className="text-[11px] font-bold">Rinks</span>
+        </button>
+
+        <button
+          type="button"
+          id="mobile-bottom-nav-flat"
+          onClick={() => setViewMode('flat')}
+          className={`flex flex-col items-center justify-center flex-1 py-1.5 px-2 rounded-xl transition cursor-pointer ${
+            viewMode === 'flat'
+              ? 'text-emerald-950 font-black bg-amber-400 ring-1 ring-amber-500 shadow-xs'
+              : 'text-stone-600 font-medium hover:text-stone-900'
+          }`}
+        >
+          <Table className="w-5 h-5 mb-0.5 text-emerald-950" />
+          <span className="text-[11px] font-bold">Flat Draw</span>
+        </button>
+
+        <button
+          type="button"
+          id="mobile-bottom-nav-scorecards"
+          onClick={() => setViewMode('scorecards')}
+          className={`flex flex-col items-center justify-center flex-1 py-1.5 px-2 rounded-xl transition cursor-pointer ${
+            viewMode === 'scorecards'
+              ? 'text-emerald-950 font-black bg-amber-400 ring-1 ring-amber-500 shadow-xs'
+              : 'text-stone-600 font-medium hover:text-stone-900'
+          }`}
+        >
+          <FileSpreadsheet className="w-5 h-5 mb-0.5 text-emerald-950" />
+          <span className="text-[11px] font-bold">Scorecards</span>
+        </button>
+      </nav>
     </div>
   );
 }
