@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Player, TournamentDraw } from '../types';
+import { isUserEnteredName } from '../utils/bowlsDraw';
 import {
   Copy,
   Check,
@@ -18,6 +19,8 @@ import {
 interface PlayerScorecardsViewProps {
   tournament: TournamentDraw;
   players: Player[];
+  startRink?: number;
+  onStartRinkChange?: (newStartRink: number) => void;
   onBackToRinks: () => void;
   onGoToFlatDraw: () => void;
   isPrintPreviewOpen?: boolean;
@@ -109,28 +112,30 @@ export const ScorecardCard: React.FC<ScorecardCardProps> = ({
   const roleTitle = getPlayerPositionTitle(group.player);
 
   return (
-    <div className="scorecard-card border-2 border-black rounded bg-white p-2.5 sm:p-3 flex flex-col justify-between h-full font-sans text-stone-900 box-border page-break-avoid">
-      {/* Card Header: Position Title & Bowler Number in font size 18 */}
-      <div className="flex items-center justify-between border-b-2 border-black pb-1.5 mb-2">
+    <div className="scorecard-card border-2 border-black rounded-none bg-white p-3 flex flex-col justify-between h-full font-sans text-stone-900 box-border page-break-avoid">
+      {/* Card Header: Position Title & Bowler Number in font size 19 */}
+      <div className="flex items-center justify-between border-b-2 border-black pb-2 mb-2 shrink-0 bg-white">
         <div className="flex items-center gap-2">
-          <span className="text-[18px] font-black uppercase text-black tracking-tight shrink-0">
+          <span className="text-[19px] font-black uppercase text-black tracking-tight shrink-0">
             {roleTitle} {group.player.bowlerNumber}
           </span>
-          <span className="text-[18px] text-stone-800 font-semibold truncate max-w-[220px] sm:max-w-[260px]">
-            ({group.player.name})
-          </span>
+          {isUserEnteredName(group.player.name, group.player.bowlerNumber) && (
+            <span className="text-[18px] text-stone-800 font-bold truncate max-w-[220px] sm:max-w-[260px]">
+              ({group.player.name})
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Scorecard Table: Font Size 18, Reduced Rink/Team & Equal-Width Results (16% Rink, 24% Team, 20% Result, 20% Ends, 20% Points) */}
-      <table className="w-full border-collapse border-2 border-black text-[18px] table-fixed">
+      {/* Scorecard Table: Font Size 19, Clean White, No Shading, Enlarged Rows */}
+      <table className="w-full border-collapse border-2 border-black text-[19px] table-fixed bg-white flex-1">
         <thead>
-          <tr className="bg-stone-100 border-b-2 border-black font-bold uppercase text-[15px] leading-snug">
-            <th className="p-1.5 border-r border-black text-left w-[16%]">Rink</th>
-            <th className="p-1.5 border-r border-black text-left w-[24%]">Team</th>
-            <th className="p-1.5 border-r border-black text-center w-[20%]">Result</th>
-            <th className="p-1.5 border-r border-black text-center w-[20%]">Ends</th>
-            <th className="p-1.5 text-center w-[20%]">Points</th>
+          <tr className="bg-white border-b-2 border-black font-extrabold uppercase text-[15px] leading-snug h-10">
+            <th className="p-2 border-r-2 border-black text-left w-[17%] bg-white">Rink</th>
+            <th className="p-2 border-r-2 border-black text-left w-[23%] bg-white">Team</th>
+            <th className="p-2 border-r-2 border-black text-center w-[20%] bg-white">W/L/D</th>
+            <th className="p-2 border-r-2 border-black text-center w-[20%] bg-white">Ends</th>
+            <th className="p-2 text-center w-[20%] bg-white">Points</th>
           </tr>
         </thead>
         <tbody>
@@ -141,36 +146,37 @@ export const ScorecardCard: React.FC<ScorecardCardProps> = ({
             const rinkText = rinkDisplayMode === 'formula' ? m.rinkFormula : `${calculatedRink}`;
 
             return (
-              <tr key={m.roundNumber} className="border-b border-black h-9">
-                {/* Rink Cell (16%) */}
-                <td className="p-1.5 border-r border-black font-bold text-left text-[18px] whitespace-nowrap overflow-hidden">
+              <tr key={m.roundNumber} className="border-b-2 border-black h-14 sm:h-16 bg-white">
+                {/* Rink Cell (17%) */}
+                <td className="p-2 border-r-2 border-black font-extrabold text-left text-[19px] whitespace-nowrap overflow-hidden align-middle bg-white">
                   {rinkText}
                 </td>
 
-                {/* Team Cell (24%) */}
-                <td className="p-1.5 border-r border-black font-bold text-left text-[18px] truncate">
+                {/* Team Cell (23%) */}
+                <td className="p-2 border-r-2 border-black font-bold text-left text-[19px] truncate align-middle bg-white">
                   {m.teamNumbers.join(', ')}
                 </td>
 
-                {/* Result Cell (20%): Font size 18, NO DASHES */}
-                <td className="p-1 border-r border-black font-bold text-center text-[18px]">
+                {/* W/L/D Cell (20%): Font size 19 */}
+                <td className="p-1 border-r-2 border-black font-bold text-center text-[19px] align-middle bg-white">
                   {isInteractive ? (
                     <input
                       type="text"
                       maxLength={6}
                       value={currentScore.result}
+                      placeholder="W/L/D"
                       onChange={(e) =>
                         onScoreChange?.(group.player.id, m.roundNumber, 'result', e.target.value)
                       }
-                      className="w-full text-center font-bold text-[18px] bg-transparent focus:bg-emerald-50 focus:outline-hidden"
+                      className="w-full h-10 text-center font-bold text-[19px] bg-white focus:outline-hidden"
                     />
                   ) : (
                     currentScore.result || ''
                   )}
                 </td>
 
-                {/* Ends Cell (20%): Font size 18, NO DASHES */}
-                <td className="p-1 border-r border-black font-bold text-center text-[18px]">
+                {/* Ends Cell (20%): Font size 19 */}
+                <td className="p-1 border-r-2 border-black font-bold text-center text-[19px] align-middle bg-white">
                   {isInteractive ? (
                     <input
                       type="number"
@@ -180,15 +186,15 @@ export const ScorecardCard: React.FC<ScorecardCardProps> = ({
                       onChange={(e) =>
                         onScoreChange?.(group.player.id, m.roundNumber, 'ends', e.target.value)
                       }
-                      className="w-full text-center font-bold text-[18px] bg-transparent focus:bg-emerald-50 focus:outline-hidden"
+                      className="w-full h-10 text-center font-bold text-[19px] bg-white focus:outline-hidden"
                     />
                   ) : (
                     currentScore.ends || ''
                   )}
                 </td>
 
-                {/* Points Cell (20%): Font size 18, NO DASHES */}
-                <td className="p-1 font-bold text-center text-[18px]">
+                {/* Points Cell (20%): Font size 19 */}
+                <td className="p-1 font-bold text-center text-[19px] align-middle bg-white">
                   {isInteractive ? (
                     <input
                       type="number"
@@ -198,7 +204,7 @@ export const ScorecardCard: React.FC<ScorecardCardProps> = ({
                       onChange={(e) =>
                         onScoreChange?.(group.player.id, m.roundNumber, 'points', e.target.value)
                       }
-                      className="w-full text-center font-bold text-[18px] bg-transparent focus:bg-emerald-50 focus:outline-hidden"
+                      className="w-full h-10 text-center font-bold text-[19px] bg-white focus:outline-hidden"
                     />
                   ) : (
                     currentScore.points || ''
@@ -208,22 +214,22 @@ export const ScorecardCard: React.FC<ScorecardCardProps> = ({
             );
           })}
 
-          {/* Custom Bottom Row: Total label directly before Result column slot (No word Summary) */}
-          <tr className="bg-stone-100 border-t-2 border-black font-bold h-9">
-            <td className="p-1.5 border-r border-black"></td>
-            <td className="p-1.5 border-r border-black text-right font-black uppercase text-[18px]">
+          {/* Custom Bottom Row: Total row */}
+          <tr className="bg-white border-t-3 border-black font-bold h-14 sm:h-16">
+            <td className="p-2 border-r-2 border-black align-middle bg-white"></td>
+            <td className="p-2 border-r-2 border-black text-right font-black uppercase text-[19px] align-middle bg-white">
               TOTAL
             </td>
-            {/* Total Result (20%): Font size 18, NO DASHES */}
-            <td className="p-1 border-r border-black text-center font-bold text-[18px]">
+            {/* Total W/L/D */}
+            <td className="p-1 border-r-2 border-black text-center font-black text-[19px] align-middle bg-white">
               {totals.resultTotal || ''}
             </td>
-            {/* Total Ends (20%): Font size 18, NO DASHES */}
-            <td className="p-1 border-r border-black text-center font-bold text-[18px]">
+            {/* Total Ends */}
+            <td className="p-1 border-r-2 border-black text-center font-black text-[19px] align-middle bg-white">
               {totals.endsTotal || ''}
             </td>
-            {/* Total Points (20%): Font size 18, NO DASHES */}
-            <td className="p-1 text-center font-bold text-[18px]">
+            {/* Total Points */}
+            <td className="p-1 text-center font-black text-[19px] align-middle bg-white">
               {totals.pointsTotal || ''}
             </td>
           </tr>
@@ -236,6 +242,8 @@ export const ScorecardCard: React.FC<ScorecardCardProps> = ({
 export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
   tournament,
   players,
+  startRink: propStartRink,
+  onStartRinkChange,
   onBackToRinks,
   onGoToFlatDraw,
   isPrintPreviewOpen,
@@ -248,20 +256,31 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
   const [previewFilterPosition, setPreviewFilterPosition] = useState<'all' | 'skip' | 'second' | 'lead'>('all');
 
   // Start rink selector (1 - 24)
-  const [startRink, setStartRink] = useState<number>(1);
+  const [localStartRink, setLocalStartRink] = useState<number>(1);
+  const startRink = propStartRink ?? localStartRink;
+  const setStartRink = (val: number) => {
+    setLocalStartRink(val);
+    onStartRinkChange?.(val);
+  };
   // Display mode for rink column: evaluated number or formula
   const [rinkDisplayMode, setRinkDisplayMode] = useState<'number' | 'formula'>('number');
   // Layout mode for on-screen view: 2x2 Landscape Cards or Full Table
   const [layoutMode, setLayoutMode] = useState<'cards' | 'table'>('cards');
 
-  const isPrintPreviewActive = isPrintPreviewOpen ?? internalPrintPreview;
+  const isPrintPreviewActive = Boolean(isPrintPreviewOpen || internalPrintPreview);
 
   const setPreviewActive = (open: boolean) => {
+    setInternalPrintPreview(open);
     if (onTogglePrintPreview) {
       onTogglePrintPreview(open);
     }
-    setInternalPrintPreview(open);
   };
+
+  useEffect(() => {
+    if (isPrintPreviewOpen !== undefined) {
+      setInternalPrintPreview(isPrintPreviewOpen);
+    }
+  }, [isPrintPreviewOpen]);
 
   useEffect(() => {
     if (!isPrintPreviewActive) return;
@@ -361,7 +380,7 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
         const numMatch = String(group.player.bowlerNumber).includes(q);
-        const nameMatch = group.player.name.toLowerCase().includes(q);
+        const nameMatch = group.player.name ? group.player.name.toLowerCase().includes(q) : false;
         return numMatch || nameMatch;
       }
       return true;
@@ -424,10 +443,13 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
       const roleTitle = getPlayerPositionTitle(group.player);
 
       // Main header for player (clean without Skips/0-29 box)
-      tsv += `${roleTitle} ${group.player.bowlerNumber} — ${group.player.name}\t\t\t\t\n`;
+      const customNameSuffix = isUserEnteredName(group.player.name, group.player.bowlerNumber)
+        ? ` — ${group.player.name}`
+        : '';
+      tsv += `${roleTitle} ${group.player.bowlerNumber}${customNameSuffix}\t\t\t\t\n`;
 
       // Header row for group under main header for player
-      tsv += `Rink\tTeam\tResult\tEnds\tPoints\n`;
+      tsv += `Rink\tTeam\tW/L/D\tEnds\tPoints\n`;
 
       // 3 match rows
       group.matches.forEach((m) => {
@@ -466,7 +488,8 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
   };
 
   const handleTriggerPrint = () => {
-    window.print();
+    // Open dedicated print window and launch system print preview dialog reliably
+    handleOpenPrintWindow();
   };
 
   const handleOpenPrintWindow = () => {
@@ -485,13 +508,14 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
         page.forEach((group) => {
           const roleTitle = getPlayerPositionTitle(group.player);
           const { resultTotal, endsTotal, pointsTotal } = getPlayerTotals(group.player.id);
+          const hasCustomName = isUserEnteredName(group.player.name, group.player.bowlerNumber);
 
           pagesHtml += `
             <div class="scorecard-card">
               <div class="card-header">
                 <div class="card-header-left">
                   <span class="role-title">${roleTitle} ${group.player.bowlerNumber}</span>
-                  <span class="player-name">(${escapeHtml(group.player.name)})</span>
+                  ${hasCustomName ? `<span class="player-name">(${escapeHtml(group.player.name)})</span>` : ''}
                 </div>
               </div>
               <table class="card-table">
@@ -499,7 +523,7 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
                   <tr>
                     <th class="col-rink">Rink</th>
                     <th class="col-team">Team</th>
-                    <th class="col-res">Result</th>
+                    <th class="col-res">W/L/D</th>
                     <th class="col-ends">Ends</th>
                     <th class="col-pts">Points</th>
                   </tr>
@@ -511,7 +535,7 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
                     const calculatedRink = startRink - 1 + m.rinkNumber;
                     const rinkText = rinkDisplayMode === 'formula' ? escapeHtml(m.rinkFormula) : `${calculatedRink}`;
                     return `
-                      <tr>
+                      <tr class="match-row">
                         <td class="col-rink font-bold">${rinkText}</td>
                         <td class="col-team font-bold">${m.teamNumbers.join(', ')}</td>
                         <td class="col-res">${currentScore.result ? escapeHtml(currentScore.result) : '&nbsp;'}</td>
@@ -556,46 +580,84 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
       width: 100%;
       height: 100%;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background: #fff;
-      color: #000;
-      font-size: 18px;
+      background: #ffffff;
+      color: #000000;
     }
+    /* Symmetrical 2x2 grid layout horizontally and vertically */
     .scorecard-landscape-page {
-      width: 100%;
-      height: 100vh;
-      max-height: 194mm;
+      box-sizing: border-box;
       display: grid;
       grid-template-columns: 1fr 1fr;
       grid-template-rows: 1fr 1fr;
-      gap: 8mm;
-      page-break-after: always;
-      break-after: page;
+      column-gap: 8mm;
+      row-gap: 8mm;
       padding: 0;
       margin: 0 auto;
-      box-sizing: border-box;
+      page-break-after: always;
+      break-after: page;
     }
     .scorecard-landscape-page:last-child {
       page-break-after: auto;
       break-after: auto;
+      margin-bottom: 0;
     }
+
+    @media screen {
+      body {
+        background: #f3f4f6;
+        padding: 24px 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .scorecard-landscape-page {
+        width: 281mm;
+        height: 194mm;
+        background: #ffffff;
+        padding: 0;
+        margin: 0 auto 28px auto;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      }
+    }
+
+    @media print {
+      body {
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+      }
+      .scorecard-landscape-page {
+        width: 100%;
+        height: 192mm;
+        max-height: 192mm;
+        margin: 1mm auto;
+        padding: 0;
+        box-shadow: none;
+      }
+    }
+
+    /* Scorecard: No shading, crisp black borders, clean white */
     .scorecard-card {
-      border: 2px solid #000;
-      border-radius: 4px;
+      border: 2px solid #000000;
+      border-radius: 0px;
       padding: 8px 10px;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      background: #fff;
+      background: #ffffff;
       height: 100%;
       box-sizing: border-box;
+      overflow: hidden;
     }
     .card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 2px solid #000;
+      border-bottom: 2px solid #000000;
       padding-bottom: 4px;
       margin-bottom: 6px;
+      flex-shrink: 0;
+      height: 32px;
+      background: #ffffff;
     }
     .card-header-left {
       display: flex;
@@ -603,49 +665,72 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
       gap: 8px;
     }
     .role-title {
-      font-size: 19px;
+      font-size: 20px;
       font-weight: 900;
       text-transform: uppercase;
+      letter-spacing: -0.01em;
     }
     .player-name {
-      font-size: 18px;
-      color: #111;
-      font-weight: 600;
+      font-size: 19px;
+      color: #111111;
+      font-weight: 700;
     }
     .card-table {
       width: 100%;
+      height: calc(100% - 38px);
+      flex: 1 1 auto;
       border-collapse: collapse;
-      font-size: 18px;
       table-layout: fixed;
+      font-size: 20px;
+      background: #ffffff;
     }
-    .card-table th, .card-table td {
-      border: 1.5px solid #000;
-      padding: 6px 6px;
-      line-height: 1.25;
+    .card-table thead tr {
+      height: 34px;
+      background: #ffffff;
     }
     .card-table th {
-      background: #f0f0f0;
-      font-weight: bold;
+      background: #ffffff;
+      font-weight: 900;
       font-size: 16px;
       text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border: 2px solid #000000;
+      padding: 4px 6px;
+      text-align: center;
+      vertical-align: middle;
     }
-    .col-rink { width: 16%; text-align: left; }
-    .col-team { width: 24%; text-align: left; }
+    .card-table th.col-rink, .card-table th.col-team {
+      text-align: left;
+    }
+    .card-table tbody tr {
+      height: calc((100% - 34px) / 4);
+      background: #ffffff;
+    }
+    .card-table td {
+      border: 2px solid #000000;
+      padding: 6px 8px;
+      font-size: 20px;
+      vertical-align: middle;
+      line-height: 1.25;
+      background: #ffffff;
+    }
+    .col-rink { width: 17%; text-align: left; font-weight: bold; }
+    .col-team { width: 23%; text-align: left; font-weight: bold; }
     .col-res  { width: 20%; text-align: center; font-weight: bold; }
     .col-ends { width: 20%; text-align: center; font-weight: bold; }
     .col-pts  { width: 20%; text-align: center; font-weight: bold; }
     .text-right { text-align: right; }
-    .bold { font-weight: bold; }
+    .bold { font-weight: 900; }
     .font-bold { font-weight: bold; }
     .total-row {
-      background: #f5f5f5;
-      font-weight: bold;
+      background: #ffffff;
+      font-weight: 900;
     }
     .total-row td {
-      border-top: 2px solid #000;
-    }
-    @media print {
-      body { margin: 0; }
+      border-top: 3px solid #000000;
+      font-weight: 900;
+      font-size: 20px;
+      background: #ffffff;
     }
   </style>
 </head>
@@ -655,7 +740,7 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
     window.onload = function() {
       setTimeout(function() {
         window.print();
-      }, 300);
+      }, 350);
     };
   </script>
 </body>
@@ -857,10 +942,10 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
                 {pos === 'all'
                   ? 'All Bowlers'
                   : pos === 'skip'
-                  ? 'Skips (0–29)'
+                  ? 'Skips'
                   : pos === 'second'
-                  ? 'Seconds (31–59)'
-                  : 'Leads (over 60)'}
+                  ? 'Seconds'
+                  : 'Leads'}
               </button>
             ))}
           </div>
@@ -949,7 +1034,7 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
                       {/* Main Header Row for Player */}
                       <tr
                         id={`scorecard-player-${group.player.bowlerNumber}`}
-                        className="bg-stone-100 border-t-2 border-b border-stone-300 font-bold"
+                        className="bg-white border-t-2 border-b border-stone-300 font-bold"
                       >
                         <td colSpan={2} className="py-2.5 px-4 text-[18px] font-black text-stone-900 border-r border-stone-200">
                           <div className="flex items-center gap-2">
@@ -967,9 +1052,11 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
                             <span className="text-[18px] font-black text-stone-900">
                               {roleTitle} {group.player.bowlerNumber}
                             </span>
-                            <span className="font-semibold text-stone-700 text-[18px] truncate max-w-[220px]">
-                              ({group.player.name})
-                            </span>
+                            {isUserEnteredName(group.player.name, group.player.bowlerNumber) && (
+                              <span className="font-semibold text-stone-700 text-[18px] truncate max-w-[220px]">
+                                ({group.player.name})
+                              </span>
+                            )}
                           </div>
                         </td>
 
@@ -977,12 +1064,12 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
                       </tr>
 
                       {/* Header Row under Main Player Header */}
-                      <tr className="bg-stone-800 text-white text-[16px] font-bold uppercase tracking-wider">
-                        <th className="py-2 px-4 border-r border-stone-700">Rink</th>
-                        <th className="py-2 px-4 border-r border-stone-700">Team</th>
-                        <th className="py-2 px-2 text-center border-r border-stone-700 bg-emerald-950/50">Result</th>
-                        <th className="py-2 px-2 text-center border-r border-stone-700 bg-emerald-950/50">Ends</th>
-                        <th className="py-2 px-2 text-center bg-emerald-950/50">Points</th>
+                      <tr className="bg-white text-stone-900 border-b-2 border-black text-[16px] font-bold uppercase tracking-wider">
+                        <th className="py-2 px-4 border-r border-stone-300 text-left">Rink</th>
+                        <th className="py-2 px-4 border-r border-stone-300 text-left">Team</th>
+                        <th className="py-2 px-2 text-center border-r border-stone-300">W/L/D</th>
+                        <th className="py-2 px-2 text-center border-r border-stone-300">Ends</th>
+                        <th className="py-2 px-2 text-center">Points</th>
                       </tr>
 
                       {/* 3 Matches */}
@@ -995,10 +1082,10 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
                         return (
                           <tr
                             key={m.roundNumber}
-                            className="border-b border-stone-200 hover:bg-stone-50/70 transition-colors text-[18px]"
+                            className="border-b border-stone-200 hover:bg-stone-50/70 transition-colors text-[18px] bg-white"
                           >
                             <td className="py-2.5 px-4 font-bold text-stone-900 border-r border-stone-200 text-[18px]">
-                              <span className="inline-block px-2.5 py-0.5 rounded bg-stone-100 text-stone-900 border border-stone-300 font-bold">
+                              <span className="inline-block px-2.5 py-0.5 rounded bg-white text-stone-900 border border-stone-300 font-bold">
                                 {rinkText}
                               </span>
                             </td>
@@ -1013,7 +1100,7 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
                                       className={`inline-flex items-center px-2 py-0.5 rounded text-[18px] font-bold ${
                                         isCurrentPlayer
                                           ? 'bg-emerald-700 text-white ring-1 ring-emerald-400'
-                                          : 'bg-emerald-50 text-emerald-950 border border-emerald-200'
+                                          : 'bg-stone-100 text-stone-900 border border-stone-300'
                                       }`}
                                       title={isCurrentPlayer ? `${roleTitle} ${num} (Self)` : `Teammate ${num}`}
                                     >
@@ -1028,11 +1115,12 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
                             </td>
 
                             {/* Result: Font size 18, NO DASHES */}
-                            <td className="py-2 px-2 text-center border-r border-stone-200 bg-emerald-50/20">
+                            <td className="py-2 px-2 text-center border-r border-stone-200 bg-white">
                               <input
                                 type="text"
                                 maxLength={6}
                                 value={currentScore.result}
+                                placeholder="W/L/D"
                                 onChange={(e) =>
                                   handleScoreChange(group.player.id, m.roundNumber, 'result', e.target.value)
                                 }
@@ -1041,7 +1129,7 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
                             </td>
 
                             {/* Ends: Font size 18, NO DASHES */}
-                            <td className="py-2 px-2 text-center border-r border-stone-200 bg-emerald-50/20">
+                            <td className="py-2 px-2 text-center border-r border-stone-200 bg-white">
                               <input
                                 type="number"
                                 min={0}
@@ -1055,7 +1143,7 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
                             </td>
 
                             {/* Points: Font size 18, NO DASHES */}
-                            <td className="py-2 px-2 text-center bg-emerald-50/20">
+                            <td className="py-2 px-2 text-center bg-white">
                               <input
                                 type="number"
                                 min={-99}
@@ -1072,27 +1160,27 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
                       })}
 
                       {/* Total Row */}
-                      <tr className="bg-stone-100 border-t-2 border-b-2 border-stone-300 font-bold text-[18px]">
+                      <tr className="bg-white border-t-2 border-b-2 border-stone-300 font-bold text-[18px]">
                         <td className="py-2 px-4 border-r border-stone-200"></td>
                         <td className="py-2 px-4 text-right font-black uppercase text-[18px] text-stone-900 tracking-wider border-r border-stone-300">
                           Total
                         </td>
-                        <td className="py-2 px-2 text-center text-[18px] font-black text-emerald-950 border-r border-stone-300 bg-emerald-100/70">
+                        <td className="py-2 px-2 text-center text-[18px] font-black text-stone-900 border-r border-stone-300 bg-white">
                           {resultTotal || ''}
                         </td>
-                        <td className="py-2 px-2 text-center text-[18px] font-black text-emerald-950 border-r border-stone-300 bg-emerald-100/70">
+                        <td className="py-2 px-2 text-center text-[18px] font-black text-stone-900 border-r border-stone-300 bg-white">
                           {endsTotal || ''}
                         </td>
-                        <td className="py-2 px-2 text-center text-[18px] font-black text-emerald-950 bg-emerald-100/70">
+                        <td className="py-2 px-2 text-center text-[18px] font-black text-stone-900 bg-white">
                           {pointsTotal || ''}
                         </td>
                       </tr>
 
                       {/* 2 Spacing Lines */}
-                      <tr className="h-6 border-0 bg-stone-50/40" aria-hidden="true">
+                      <tr className="h-6 border-0 bg-white" aria-hidden="true">
                         <td colSpan={5} className="p-0 border-0 h-6"></td>
                       </tr>
-                      <tr className="h-6 border-0 bg-stone-50/40" aria-hidden="true">
+                      <tr className="h-6 border-0 bg-white" aria-hidden="true">
                         <td colSpan={5} className="p-0 border-0 h-6"></td>
                       </tr>
                     </React.Fragment>

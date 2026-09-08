@@ -1,9 +1,11 @@
 import React from 'react';
 import { Rink, Player } from '../types';
 import { Crown, Circle, Target, ArrowLeftRight, Check } from 'lucide-react';
+import { isUserEnteredName } from '../utils/bowlsDraw';
 
 interface RinkCardProps {
   rink: Rink;
+  startRink?: number;
   selectedPlayerId: string | null;
   onSelectPlayer: (player: Player, rinkNumber: number, teamColor: 'red' | 'blue', role: 'skip' | 'second' | 'lead') => void;
   searchQuery: string;
@@ -11,10 +13,12 @@ interface RinkCardProps {
 
 export const RinkCard: React.FC<RinkCardProps> = ({
   rink,
+  startRink = 1,
   selectedPlayerId,
   onSelectPlayer,
   searchQuery
 }) => {
+  const calculatedRink = (startRink - 1) + rink.rinkNumber;
   const isSearchMatch = (name: string) => {
     if (!searchQuery.trim()) return false;
     return name.toLowerCase().includes(searchQuery.toLowerCase().trim());
@@ -39,6 +43,10 @@ export const RinkCard: React.FC<RinkCardProps> = ({
         ? 'bg-sky-100 text-sky-900 border-sky-300'
         : 'bg-emerald-100 text-emerald-900 border-emerald-300';
 
+    const displayName = isUserEnteredName(player.name, player.bowlerNumber)
+      ? player.name
+      : `Player ${player.bowlerNumber}`;
+
     return (
       <button
         type="button"
@@ -50,7 +58,7 @@ export const RinkCard: React.FC<RinkCardProps> = ({
             ? 'bg-emerald-100/80 border-emerald-500 ring-2 ring-emerald-400'
             : 'bg-white hover:bg-stone-50 border-stone-200/80'
         }`}
-        title={`Click to swap ${player.name} (Position: ${role.toUpperCase()})`}
+        title={`Click to swap ${displayName} (Position: ${role.toUpperCase()})`}
       >
         <div className="flex items-center gap-2 min-w-0">
           {/* Positional Number Badge */}
@@ -63,7 +71,7 @@ export const RinkCard: React.FC<RinkCardProps> = ({
 
           <div className="min-w-0">
             <p className={`text-sm font-semibold truncate ${isSelected ? 'text-amber-950' : 'text-stone-900'}`}>
-              {player.name}
+              {displayName}
             </p>
             <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-medium">
               <span className="capitalize">{roleLabel}</span>
@@ -92,10 +100,10 @@ export const RinkCard: React.FC<RinkCardProps> = ({
       <div className="bg-gradient-to-r from-emerald-800 to-emerald-900 px-4 py-3 flex items-center justify-between text-white border-b border-emerald-950/20">
         <div className="flex items-center gap-2">
           <span className="w-7 h-7 rounded-full bg-amber-400 text-emerald-950 font-black text-xs flex items-center justify-center font-heading">
-            {rink.rinkNumber}
+            {calculatedRink}
           </span>
           <h3 className="font-bold text-base tracking-wide font-heading">
-            RINK {rink.rinkNumber}
+            RINK {calculatedRink}
           </h3>
         </div>
         <span className="text-[11px] font-medium text-emerald-200/90 bg-emerald-950/40 px-2 py-0.5 rounded-full">

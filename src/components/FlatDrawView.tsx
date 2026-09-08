@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { Player, TournamentDraw } from '../types';
 import { Copy, Check, Printer, ArrowLeft, Search, Filter, Shield, User, FileSpreadsheet } from 'lucide-react';
-import { formatFlatDrawText } from '../utils/bowlsDraw';
+import { formatFlatDrawText, isUserEnteredName } from '../utils/bowlsDraw';
 
 interface FlatDrawViewProps {
   tournament: TournamentDraw;
   players: Player[];
+  startRink?: number;
   onBackToRinks: () => void;
   onGoToScorecards?: () => void;
   onPrint: () => void;
@@ -27,6 +28,7 @@ interface PlayerFlatRow {
 export const FlatDrawView: React.FC<FlatDrawViewProps> = ({
   tournament,
   players,
+  startRink = 1,
   onBackToRinks,
   onGoToScorecards,
   onPrint
@@ -97,7 +99,7 @@ export const FlatDrawView: React.FC<FlatDrawViewProps> = ({
   }, [flatRows, filterPosition, searchNumber]);
 
   const handleCopy = () => {
-    const text = formatFlatDrawText(tournament, players);
+    const text = formatFlatDrawText(tournament, players, startRink);
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2200);
@@ -299,9 +301,11 @@ export const FlatDrawView: React.FC<FlatDrawViewProps> = ({
                           <div className="font-bold text-stone-900 text-sm leading-tight">
                             Player {player.bowlerNumber}
                           </div>
-                          <div className="text-[11px] text-stone-500 truncate max-w-[110px]">
-                            {player.name}
-                          </div>
+                          {isUserEnteredName(player.name, player.bowlerNumber) && (
+                            <div className="text-[11px] text-stone-500 truncate max-w-[110px]">
+                              {player.name}
+                            </div>
+                          )}
                           <div className="mt-1">
                             {getPositionBadge(player.position)}
                           </div>
@@ -310,17 +314,19 @@ export const FlatDrawView: React.FC<FlatDrawViewProps> = ({
                     </td>
 
                     {/* Chronological Matches: Round 1, 2, 3 */}
-                    {matches.map((m) => (
-                      <td
-                        key={m.roundNumber}
-                        className="py-3.5 px-4 align-top border-l border-stone-200"
-                      >
-                        <div className="space-y-2">
-                          {/* Round and Rink Header (Replaces Match 1 (Round 1): Rink 4 (Red) with Round 1. Rink 4) */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-md font-black text-xs bg-stone-800 text-white tracking-wide">
-                              Round {m.roundNumber}. Rink {m.rinkNumber}
-                            </span>
+                    {matches.map((m) => {
+                      const calculatedRink = (startRink - 1) + m.rinkNumber;
+                      return (
+                        <td
+                          key={m.roundNumber}
+                          className="py-3.5 px-4 align-top border-l border-stone-200"
+                        >
+                          <div className="space-y-2">
+                            {/* Round and Rink Header (Replaces Match 1 (Round 1): Rink 4 (Red) with Round 1. Rink 4) */}
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-md font-black text-xs bg-stone-800 text-white tracking-wide">
+                                Round {m.roundNumber}. Rink {calculatedRink}
+                              </span>
                             <span
                               className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                                 m.teamColor === 'Red'
@@ -381,8 +387,9 @@ export const FlatDrawView: React.FC<FlatDrawViewProps> = ({
                           </div>
                         </div>
                       </td>
-                    ))}
-                  </tr>
+                    );
+                  })}
+                </tr>
                 );
               })}
             </tbody>
@@ -433,7 +440,7 @@ export const FlatDrawView: React.FC<FlatDrawViewProps> = ({
                 {matches.map((m) => (
                   <td key={m.roundNumber} className="p-1.5 border-r border-black last:border-r-0">
                     <div className="font-bold">
-                      Round {m.roundNumber}. Rink {m.rinkNumber}
+                      Round {m.roundNumber}. Rink {(startRink - 1) + m.rinkNumber}
                     </div>
                     <div>
                       <span className="text-[10px] text-neutral-600">Team: </span>

@@ -20,8 +20,8 @@ import confetti from 'canvas-confetti';
 
 export default function App() {
   const [playerCount, setPlayerCount] = useState<number>(24);
-  const [players, setPlayers] = useState<Player[]>(() => generateDefaultPlayers(24, true));
-  const [tournament, setTournament] = useState<TournamentDraw | null>(() => executeTournamentDraw(generateDefaultPlayers(24, true), 24));
+  const [players, setPlayers] = useState<Player[]>(() => generateDefaultPlayers(24, false));
+  const [tournament, setTournament] = useState<TournamentDraw | null>(() => executeTournamentDraw(generateDefaultPlayers(24, false), 24));
   const [activeRound, setActiveRound] = useState<number>(1); // 1, 2, 3 or 0 for All
   const [viewMode, setViewMode] = useState<'rinks' | 'flat' | 'scorecards'>('rinks');
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
@@ -31,6 +31,8 @@ export default function App() {
   const [copied, setCopied] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isScorecardsPrintPreviewOpen, setIsScorecardsPrintPreviewOpen] = useState<boolean>(false);
+  const [startRink, setStartRink] = useState<number>(1);
+  const [keepPair, setKeepPair] = useState<boolean>(false);
 
   // Selected player for swapping
   const [swapSelection, setSwapSelection] = useState<{
@@ -56,10 +58,10 @@ export default function App() {
     setSwapSelection(null);
 
     setTimeout(() => {
-      const newTournament = executeTournamentDraw(players, playerCount);
+      const newTournament = executeTournamentDraw(players, playerCount, keepPair);
       setTournament(newTournament);
       setIsDrawing(false);
-      showToast(`3-Round Draw generated! 100% unique teammates & opponents across all rounds.`);
+      showToast(keepPair ? 'Generated 3-round draw keeping Skips & Seconds paired!' : '3-Round Draw generated! 100% unique teammates & opponents across all rounds.');
 
       // Gentle celebratory confetti
       try {
@@ -73,7 +75,7 @@ export default function App() {
         // Confetti fallback
       }
     }, 300);
-  }, [players, playerCount, showToast]);
+  }, [players, playerCount, keepPair, showToast]);
 
   // Initial draw on mount
   useEffect(() => {
@@ -85,14 +87,34 @@ export default function App() {
     setPlayerCount(newCount);
     setSwapSelection(null);
 
-    const fresh = generateDefaultPlayers(newCount, true);
+    const fresh = generateDefaultPlayers(newCount, false);
     setPlayers(fresh);
 
     setTimeout(() => {
-      const newTournament = executeTournamentDraw(fresh, newCount);
+      const newTournament = executeTournamentDraw(fresh, newCount, keepPair);
       setTournament(newTournament);
       showToast(`Updated to ${newCount} bowlers (${Math.floor(newCount / 6)} rinks) with 3-round schedule`);
     }, 50);
+  };
+
+  // Handle Keep Pair change
+  const handleKeepPairChange = (newKeepPair: boolean) => {
+    setKeepPair(newKeepPair);
+    setSwapSelection(null);
+    setIsDrawing(true);
+
+    setTimeout(() => {
+      const newTournament = executeTournamentDraw(players, playerCount, newKeepPair);
+      setTournament(newTournament);
+      setIsDrawing(false);
+      showToast(newKeepPair ? 'Keep Pair enabled: Lead 60 & Second 30 remain together with distinct Skips' : 'Keep Pair disabled: Full rotation across rounds');
+    }, 100);
+  };
+
+  // Handle Scorecards Print from top bar
+  const handlePrintScorecards = () => {
+    setViewMode('scorecards');
+    setIsScorecardsPrintPreviewOpen(true);
   };
 
   // Determine current active rounds to display
@@ -187,7 +209,7 @@ export default function App() {
   const handleResetToDefault = (useSampleNames: boolean) => {
     const fresh = generateDefaultPlayers(playerCount, useSampleNames);
     setPlayers(fresh);
-    const newTournament = executeTournamentDraw(fresh, playerCount);
+    const newTournament = executeTournamentDraw(fresh, playerCount, keepPair);
     setTournament(newTournament);
     showToast(useSampleNames ? 'Loaded sample club bowlers' : 'Reset to Player 1..N');
   };
@@ -195,14 +217,14 @@ export default function App() {
   // Update players from modal
   const handleUpdatePlayers = (updated: Player[]) => {
     setPlayers(updated);
-    const newTournament = executeTournamentDraw(updated, playerCount);
+    const newTournament = executeTournamentDraw(updated, playerCount, keepPair);
     setTournament(newTournament);
   };
 
   // Copy draw to clipboard
   const handleCopyDraw = () => {
     if (!tournament) return;
-    const text = formatTournamentDrawText(tournament);
+    const text = formatTournamentDrawText(tournament, startRink);
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       showToast('3-Round draw copied to clipboard! Ready to paste into chat or notice.');
@@ -210,10 +232,107 @@ export default function App() {
     });
   };
 
-  // Print sheet
+  // Print sheet with full iframe compatibility
+  const handlePrintRinksDraw = () => {
+    if (!tournament) return;
+    try {
+      const printWin = window.open('', '_blank');
+      if (!printWin) {
+        window.print();
+        return;
+      }
+      let rinksHtml = '';
+      tournament.rounds.forEach((round) => {
+        rinksHtml += `
+          <div style="margin-bottom: 24px; page-break-inside: avoid;">
+            <div style="background: #f0f0f0; border: 1.5px solid #000; padding: 6px 12px; font-weight: 900; font-size: 15px; text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between;">
+              <span>ROUND ${round.roundNumber} OF 3</span>
+              <span style="font-size: 12px; font-family: monospace;">${round.rinks.length} Rinks in Play</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              ${round.rinks.map((rink) => {
+                const calcRink = startRink - 1 + rink.rinkNumber;
+                return `
+                  <div style="border: 2px solid #000; border-radius: 6px; padding: 8px; page-break-inside: avoid; background: #fff;">
+                    <div style="background: #f8f8f8; border-bottom: 1.5px solid #000; margin: -8px -8px 8px -8px; padding: 5px 8px; display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-weight: 900; font-size: 14px;">RINK ${calcRink}</span>
+                      <span style="font-size: 10px; font-weight: bold; text-transform: uppercase;">Triples Match</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;">
+                      <div style="border: 1px solid #999; border-radius: 4px; padding: 5px;">
+                        <div style="font-weight: 900; font-size: 11px; border-bottom: 1px solid #ccc; padding-bottom: 2px; margin-bottom: 3px; display: flex; justify-content: space-between;">
+                          <span style="color: #b91c1c;">RED</span>
+                          <span>Score: ___</span>
+                        </div>
+                        <div style="line-height: 1.3;">
+                          <div><span style="font-size: 9px; color: #555; font-weight: bold;">Skip:</span> <b>#${rink.teamA.skip.bowlerNumber}</b> ${rink.teamA.skip.name}</div>
+                          <div><span style="font-size: 9px; color: #555; font-weight: bold;">Second:</span> <b>#${rink.teamA.second.bowlerNumber}</b> ${rink.teamA.second.name}</div>
+                          <div><span style="font-size: 9px; color: #555; font-weight: bold;">Lead:</span> <b>#${rink.teamA.lead.bowlerNumber}</b> ${rink.teamA.lead.name}</div>
+                        </div>
+                      </div>
+                      <div style="border: 1px solid #999; border-radius: 4px; padding: 5px;">
+                        <div style="font-weight: 900; font-size: 11px; border-bottom: 1px solid #ccc; padding-bottom: 2px; margin-bottom: 3px; display: flex; justify-content: space-between;">
+                          <span style="color: #1d4ed8;">BLUE</span>
+                          <span>Score: ___</span>
+                        </div>
+                        <div style="line-height: 1.3;">
+                          <div><span style="font-size: 9px; color: #555; font-weight: bold;">Skip:</span> <b>#${rink.teamB.skip.bowlerNumber}</b> ${rink.teamB.skip.name}</div>
+                          <div><span style="font-size: 9px; color: #555; font-weight: bold;">Second:</span> <b>#${rink.teamB.second.bowlerNumber}</b> ${rink.teamB.second.name}</div>
+                          <div><span style="font-size: 9px; color: #555; font-weight: bold;">Lead:</span> <b>#${rink.teamB.lead.bowlerNumber}</b> ${rink.teamB.lead.name}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      });
+
+      printWin.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Lawn Bowls 3-Round Tournament Draw</title>
+  <style>
+    @page { size: portrait; margin: 10mm; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 12px; color: #000; background: #fff; }
+    h1 { font-size: 20px; font-weight: 900; text-transform: uppercase; margin: 0 0 4px 0; }
+    p { margin: 2px 0; font-size: 12px; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div style="border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-end;">
+    <div>
+      <h1>Lawn Bowls 3-Round Tournament Draw</h1>
+      <p style="font-weight: bold; color: #333;">${playerCount} Bowlers (${tournament.rinkCount} Rinks • Triples) • Start Rink: ${startRink}</p>
+    </div>
+    <div style="text-align: right; font-size: 11px; font-family: monospace;">
+      <p>Date: ${todayStr}</p>
+    </div>
+  </div>
+  ${rinksHtml}
+  <script>
+    window.onload = function() {
+      setTimeout(function() { window.print(); }, 350);
+    };
+  </script>
+</body>
+</html>`);
+      printWin.document.close();
+    } catch {
+      window.print();
+    }
+  };
+
   const handlePrint = () => {
     if (viewMode === 'scorecards') {
       setIsScorecardsPrintPreviewOpen(true);
+    } else if (viewMode === 'rinks') {
+      handlePrintRinksDraw();
     } else {
       window.print();
     }
@@ -281,6 +400,11 @@ export default function App() {
         <PlayerCountSelector
           playerCount={playerCount}
           onCountChange={handleCountChange}
+          startRink={startRink}
+          onStartRinkChange={setStartRink}
+          keepPair={keepPair}
+          onKeepPairChange={handleKeepPairChange}
+          onPrintScorecards={handlePrintScorecards}
           onGenerateDraw={handleGenerateDraw}
           isDrawing={isDrawing}
           hasDraw={tournament !== null}
@@ -312,6 +436,7 @@ export default function App() {
           <FlatDrawView
             tournament={tournament}
             players={players}
+            startRink={startRink}
             onBackToRinks={() => setViewMode('rinks')}
             onGoToScorecards={() => setViewMode('scorecards')}
             onPrint={handlePrint}
@@ -320,6 +445,8 @@ export default function App() {
           <PlayerScorecardsView
             tournament={tournament}
             players={players}
+            startRink={startRink}
+            onStartRinkChange={setStartRink}
             onBackToRinks={() => setViewMode('rinks')}
             onGoToFlatDraw={() => setViewMode('flat')}
             isPrintPreviewOpen={isScorecardsPrintPreviewOpen}
@@ -419,6 +546,7 @@ export default function App() {
                     <RinkCard
                       key={rink.id}
                       rink={rink}
+                      startRink={startRink}
                       selectedPlayerId={swapSelection?.player.id || null}
                       onSelectPlayer={(p, rNum, color, role) => handleSelectPlayer(p, rNum, color, role, round.roundNumber)}
                       searchQuery={searchQuery}

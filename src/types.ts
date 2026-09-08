@@ -43,6 +43,7 @@ export interface TournamentDraw {
   rinkCount: number;
   rounds: RoundDraw[];
   metrics: DrawMetrics;
+  keepPair?: boolean;
 }
 
 export interface DrawConfig {

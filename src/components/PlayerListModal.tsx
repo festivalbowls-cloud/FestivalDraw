@@ -52,7 +52,7 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
 
     // First countPerRole are Skips (1+)
     for (let i = 0; i < countPerRole; i++) {
-      const name = lines[i] || `Skip ${i + 1}`;
+      const name = lines[i] || '';
       newPlayers.push({
         id: `skip-${1 + i}`,
         name,
@@ -64,7 +64,7 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
 
     // Next countPerRole are Seconds (30+)
     for (let i = 0; i < countPerRole; i++) {
-      const name = lines[countPerRole + i] || `Second ${i + 1}`;
+      const name = lines[countPerRole + i] || '';
       newPlayers.push({
         id: `second-${30 + i}`,
         name,
@@ -76,7 +76,7 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
 
     // Next countPerRole are Leads (60+)
     for (let i = 0; i < countPerRole; i++) {
-      const name = lines[countPerRole * 2 + i] || `Lead ${i + 1}`;
+      const name = lines[countPerRole * 2 + i] || '';
       newPlayers.push({
         id: `lead-${60 + i}`,
         name,
@@ -133,7 +133,7 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
                 value={player.name}
                 onChange={(e) => handleNameChange(player.id, e.target.value)}
                 className="flex-1 min-w-0 px-2.5 py-1 text-sm bg-white border border-stone-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-emerald-600 text-stone-900 font-medium"
-                placeholder={`Bowler #${player.bowlerNumber}`}
+                placeholder="Enter player name (or leave blank)"
               />
             </div>
           ))}
