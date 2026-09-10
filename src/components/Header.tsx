@@ -70,7 +70,6 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
                 <p className="text-[11px] text-emerald-200/80 truncate">
                   {playerCount} Bowlers • {rinkCount} {rinkCount === 1 ? 'Rink' : 'Rinks'}
-                  {playerCount % 6 !== 0 ? ` • 6N-${playerCount % 6 === 4 ? 2 : 4}` : ''}
                 </p>
               </div>
             </div>

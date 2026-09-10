@@ -81,20 +81,9 @@ export const PlayerCountSelector: React.FC<PlayerCountSelectorProps> = ({
                 >
                   {EVEN_PLAYER_COUNTS.map((num) => {
                     const rinks = Math.max(1, Math.ceil(num / 6));
-                    const numRem = num % 6;
-                    let detail = `${rinks} ${rinks === 1 ? 'Rink' : 'Rinks'}`;
-                    if (numRem === 4) {
-                      detail += ` • 6N-2 (-2 Sec)`;
-                    } else if (numRem === 2) {
-                      if (num < 20) {
-                        detail += ` • 6N-4 (-2 Sec, -2 Lead)`;
-                      } else {
-                        detail += ` • 6N-4 (-4 Sec)`;
-                      }
-                    }
                     return (
                       <option key={num} value={num} className="font-sans py-1.5 text-stone-900 font-medium">
-                        {num} Players ({detail})
+                        {num} Players ({rinks} {rinks === 1 ? 'Rink' : 'Rinks'})
                       </option>
                     );
                   })}
@@ -226,11 +215,11 @@ export const PlayerCountSelector: React.FC<PlayerCountSelectorProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               {isSmall6nMinus4 ? (
                 <span className="text-xs font-semibold text-sky-900 bg-sky-50 px-2.5 py-0.5 rounded-md border border-sky-200 flex items-center gap-1">
-                  6N-4 Format: -2 Seconds &amp; -2 Leads ({rinkCount === 2 ? 'All Pairs' : '1 Triples, 2 Pairs'})
+                  Format: -2 Seconds &amp; -2 Leads ({rinkCount === 2 ? 'All Pairs' : '1 Triples, 2 Pairs'})
                 </span>
               ) : secondsRemoved > 0 ? (
                 <span className="text-xs font-semibold text-sky-900 bg-sky-50 px-2.5 py-0.5 rounded-md border border-sky-200 flex items-center gap-1">
-                  6N-{secondsRemoved} Format: -{secondsRemoved} Second{secondsRemoved > 1 ? 's' : ''} ({secondsRemoved / 2} Pairs {secondsRemoved / 2 === 1 ? 'match' : 'matches'})
+                  Format: -{secondsRemoved} Second{secondsRemoved > 1 ? 's' : ''} ({secondsRemoved / 2} Pairs {secondsRemoved / 2 === 1 ? 'match' : 'matches'})
                 </span>
               ) : null}
 
