@@ -16,8 +16,8 @@ interface PlayerCountSelectorProps {
   onToggleBalanceRoles: (enabled: boolean) => void;
 }
 
-// Multiples of 6 options: from 6 (1 rink) up to 72 or 96 (16 rinks)
-const MULTIPLES_OF_SIX = Array.from({ length: 16 }, (_, i) => (i + 1) * 6);
+// Even numbers options: from 4 (1 rink pairs) or 6 (1 rink triples) up to 96 (16 rinks)
+export const EVEN_PLAYER_COUNTS = Array.from({ length: 47 }, (_, i) => (i + 2) * 2); // 4, 6, 8, 10, ..., 96
 const RINK_OPTIONS = Array.from({ length: 24 }, (_, i) => i + 1);
 
 export const PlayerCountSelector: React.FC<PlayerCountSelectorProps> = ({
@@ -34,7 +34,14 @@ export const PlayerCountSelector: React.FC<PlayerCountSelectorProps> = ({
   balanceRoles,
   onToggleBalanceRoles
 }) => {
-  const rinkCount = Math.max(1, Math.floor(playerCount / 6));
+  const rinkCount = Math.max(1, Math.ceil(playerCount / 6));
+  const rem = playerCount % 6;
+  const isSmall6nMinus4 = playerCount < 20 && rem === 2;
+  const secondsRemoved = isSmall6nMinus4 ? 2 : rem === 4 ? 2 : rem === 2 ? 4 : 0;
+  const leadsRemoved = isSmall6nMinus4 ? 2 : 0;
+  const numSkips = rinkCount * 2;
+  const numSeconds = Math.max(0, rinkCount * 2 - secondsRemoved);
+  const numLeads = Math.max(0, rinkCount * 2 - leadsRemoved);
 
   return (
     <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-4 sm:p-5 mb-6 no-print">
@@ -56,6 +63,11 @@ export const PlayerCountSelector: React.FC<PlayerCountSelectorProps> = ({
                 </label>
                 <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                   {rinkCount} {rinkCount === 1 ? 'Rink' : 'Rinks'}
+                  {isSmall6nMinus4
+                    ? ' • -2 Sec, -2 Lead'
+                    : secondsRemoved > 0
+                    ? ` • -${secondsRemoved} Sec`
+                    : ''}
                 </span>
               </div>
 
@@ -65,13 +77,24 @@ export const PlayerCountSelector: React.FC<PlayerCountSelectorProps> = ({
                   value={playerCount}
                   onChange={(e) => onCountChange(Number(e.target.value))}
                   className="w-full h-10 sm:h-11 pl-3 pr-9 text-sm sm:text-base font-bold text-stone-900 bg-stone-50 hover:bg-stone-100/80 border-2 border-emerald-600 rounded-xl focus:outline-hidden focus:ring-3 focus:ring-emerald-500/20 focus:border-emerald-700 transition cursor-pointer appearance-none shadow-xs"
-                  aria-label="Select number of players (multiples of 6)"
+                  aria-label="Select number of players (all even numbers)"
                 >
-                  {MULTIPLES_OF_SIX.map((num) => {
-                    const rinks = num / 6;
+                  {EVEN_PLAYER_COUNTS.map((num) => {
+                    const rinks = Math.max(1, Math.ceil(num / 6));
+                    const numRem = num % 6;
+                    let detail = `${rinks} ${rinks === 1 ? 'Rink' : 'Rinks'}`;
+                    if (numRem === 4) {
+                      detail += ` • 6N-2 (-2 Sec)`;
+                    } else if (numRem === 2) {
+                      if (num < 20) {
+                        detail += ` • 6N-4 (-2 Sec, -2 Lead)`;
+                      } else {
+                        detail += ` • 6N-4 (-4 Sec)`;
+                      }
+                    }
                     return (
                       <option key={num} value={num} className="font-sans py-1.5 text-stone-900 font-medium">
-                        {num} Players ({rinks} {rinks === 1 ? 'Rink' : 'Rinks'})
+                        {num} Players ({detail})
                       </option>
                     );
                   })}
@@ -190,22 +213,34 @@ export const PlayerCountSelector: React.FC<PlayerCountSelectorProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold text-stone-600">Player Numbers:</span>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 font-bold border border-amber-300">
-                Skips: 1–29
+                Skips: 1–29 ({numSkips})
               </span>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-100 text-sky-950 font-bold border border-sky-300">
-                Seconds: 30–59
+                Seconds: 30–59 ({numSeconds})
               </span>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-950 font-bold border border-emerald-300">
-                Leads: 60–89
+                Leads: 60–89 ({numLeads})
               </span>
             </div>
 
-            {keepPair && (
-              <span className="text-xs font-semibold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
-                <Link2 className="w-3.5 h-3.5 text-amber-700" />
-                Keep Pair Active: Lead 60 &amp; Second 30 remain together always with distinct Skips
-              </span>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {isSmall6nMinus4 ? (
+                <span className="text-xs font-semibold text-sky-900 bg-sky-50 px-2.5 py-0.5 rounded-md border border-sky-200 flex items-center gap-1">
+                  6N-4 Format: -2 Seconds &amp; -2 Leads ({rinkCount === 2 ? 'All Pairs' : '1 Triples, 2 Pairs'})
+                </span>
+              ) : secondsRemoved > 0 ? (
+                <span className="text-xs font-semibold text-sky-900 bg-sky-50 px-2.5 py-0.5 rounded-md border border-sky-200 flex items-center gap-1">
+                  6N-{secondsRemoved} Format: -{secondsRemoved} Second{secondsRemoved > 1 ? 's' : ''} ({secondsRemoved / 2} Pairs {secondsRemoved / 2 === 1 ? 'match' : 'matches'})
+                </span>
+              ) : null}
+
+              {keepPair && (
+                <span className="text-xs font-semibold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
+                  <Link2 className="w-3.5 h-3.5 text-amber-700" />
+                  Keep Pair: Lead 60 &amp; Second 30 together
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

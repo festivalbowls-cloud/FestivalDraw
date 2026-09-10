@@ -51,11 +51,11 @@ export const PrintScorecardView: React.FC<PrintScorecardViewProps> = ({
       <div className="space-y-8">
         {displayRounds.map((round) => (
           <div key={round.roundNumber} className="border-t-2 border-dashed border-neutral-300 pt-4 first:border-t-0 first:pt-0">
-            <div className="bg-neutral-100 border border-neutral-300 rounded px-3 py-1.5 mb-4 flex justify-between items-center">
+            <div className="bg-white border-2 border-black rounded px-3 py-1.5 mb-4 flex justify-between items-center">
               <span className="font-black text-base uppercase tracking-wider">
                 ROUND {round.roundNumber} OF 3
               </span>
-              <span className="text-xs font-mono text-neutral-600">
+              <span className="text-xs font-mono text-neutral-800 font-bold">
                 {round.rinks.length} Rinks in Play
               </span>
             </div>
@@ -65,20 +65,20 @@ export const PrintScorecardView: React.FC<PrintScorecardViewProps> = ({
               {round.rinks.map((rink) => (
                 <div
                   key={rink.id}
-                  className="border-2 border-black rounded-lg p-2.5 page-break-avoid"
+                  className="border-2 border-black rounded p-2.5 bg-white page-break-avoid"
                 >
-                  <div className="bg-neutral-200 border-b border-black -mx-2.5 -mt-2.5 p-1.5 flex justify-between items-center mb-2">
+                  <div className="bg-white border-b-2 border-black -mx-2.5 -mt-2.5 p-1.5 flex justify-between items-center mb-2">
                     <span className="font-black text-sm">RINK {rink.rinkNumber}</span>
                     <span className="text-[10px] font-bold uppercase tracking-wider">
-                      Triples Match
+                      {(!rink.teamA.second && !rink.teamB.second) ? 'Pairs Match (4 Bowls)' : 'Triples Match'}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    {/* Red Team */}
-                    <div className="border border-neutral-400 rounded p-1.5">
+                    {/* Team A */}
+                    <div className="border border-neutral-400 rounded p-1.5 bg-white">
                       <div className="font-black text-[11px] uppercase border-b border-neutral-300 pb-1 mb-1 flex justify-between">
-                        <span>RED</span>
+                        <span>TEAM A</span>
                         <span>Score: ___</span>
                       </div>
                       <div className="space-y-0.5 text-[11px]">
@@ -86,21 +86,29 @@ export const PrintScorecardView: React.FC<PrintScorecardViewProps> = ({
                           <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">SKIP (1+):</span>
                           <span className="font-bold leading-tight">#{rink.teamA.skip.bowlerNumber} {rink.teamA.skip.name}</span>
                         </div>
+                        {rink.teamA.second ? (
+                          <div>
+                            <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">SECOND (30+):</span>
+                            <span className="font-bold leading-tight">#{rink.teamA.second.bowlerNumber} {rink.teamA.second.name}</span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="font-semibold text-[9px] text-neutral-400 block leading-tight italic">No Second (Pairs)</span>
+                          </div>
+                        )}
                         <div>
-                          <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">SECOND (30+):</span>
-                          <span className="font-bold leading-tight">#{rink.teamA.second.bowlerNumber} {rink.teamA.second.name}</span>
-                        </div>
-                        <div>
-                          <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">LEAD (60+):</span>
+                          <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">
+                            {rink.teamA.lead.bowlerNumber < 60 ? 'LEAD / PARTNER (30+):' : 'LEAD (60+):'}
+                          </span>
                           <span className="font-bold leading-tight">#{rink.teamA.lead.bowlerNumber} {rink.teamA.lead.name}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Blue Team */}
-                    <div className="border border-neutral-400 rounded p-1.5">
+                    {/* Team B */}
+                    <div className="border border-neutral-400 rounded p-1.5 bg-white">
                       <div className="font-black text-[11px] uppercase border-b border-neutral-300 pb-1 mb-1 flex justify-between">
-                        <span>BLUE</span>
+                        <span>TEAM B</span>
                         <span>Score: ___</span>
                       </div>
                       <div className="space-y-0.5 text-[11px]">
@@ -108,12 +116,20 @@ export const PrintScorecardView: React.FC<PrintScorecardViewProps> = ({
                           <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">SKIP (1+):</span>
                           <span className="font-bold leading-tight">#{rink.teamB.skip.bowlerNumber} {rink.teamB.skip.name}</span>
                         </div>
+                        {rink.teamB.second ? (
+                          <div>
+                            <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">SECOND (30+):</span>
+                            <span className="font-bold leading-tight">#{rink.teamB.second.bowlerNumber} {rink.teamB.second.name}</span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="font-semibold text-[9px] text-neutral-400 block leading-tight italic">No Second (Pairs)</span>
+                          </div>
+                        )}
                         <div>
-                          <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">SECOND (30+):</span>
-                          <span className="font-bold leading-tight">#{rink.teamB.second.bowlerNumber} {rink.teamB.second.name}</span>
-                        </div>
-                        <div>
-                          <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">LEAD (60+):</span>
+                          <span className="font-semibold text-[9px] text-neutral-600 block leading-tight">
+                            {rink.teamB.lead.bowlerNumber < 60 ? 'LEAD / PARTNER (30+):' : 'LEAD (60+):'}
+                          </span>
                           <span className="font-bold leading-tight">#{rink.teamB.lead.bowlerNumber} {rink.teamB.lead.name}</span>
                         </div>
                       </div>
@@ -123,7 +139,7 @@ export const PrintScorecardView: React.FC<PrintScorecardViewProps> = ({
                   {/* Scorecard row for writing ends */}
                   <div className="mt-2 pt-1 border-t border-dashed border-neutral-400 flex justify-between text-[10px] font-mono">
                     <span>Ends: [  ]</span>
-                    <span>Winner: [ RED / BLUE ]</span>
+                    <span>Result: [ W / L / D ]</span>
                     <span>Sign: ____________</span>
                   </div>
                 </div>

@@ -57,38 +57,47 @@ export const TournamentRoundSelector: React.FC<TournamentRoundSelectorProps> = (
   const getBowlerItinerary = (bowler: Player) => {
     return rounds.map(round => {
       let foundRink: number | null = null;
-      let teamColor: 'Red' | 'Blue' | null = null;
+      let teamSide: 'Team A' | 'Team B' | null = null;
       let teammates: string[] = [];
       let opponent: string = '';
 
       round.rinks.forEach(r => {
-        if (r.teamA.skip.bowlerNumber === bowler.bowlerNumber ||
-            r.teamA.second.bowlerNumber === bowler.bowlerNumber ||
-            r.teamA.lead.bowlerNumber === bowler.bowlerNumber) {
+        const teamAPlayers = [r.teamA.skip, r.teamA.second, r.teamA.lead].filter((p): p is Player => p !== null && p !== undefined);
+        const teamBPlayers = [r.teamB.skip, r.teamB.second, r.teamB.lead].filter((p): p is Player => p !== null && p !== undefined);
+
+        if (teamAPlayers.some(p => p.bowlerNumber === bowler.bowlerNumber)) {
           foundRink = r.rinkNumber;
-          teamColor = 'Red';
-          const team = [r.teamA.skip, r.teamA.second, r.teamA.lead].filter(p => p.bowlerNumber !== bowler.bowlerNumber);
-          teammates = team.map(p => `#${p.bowlerNumber} ${p.name}`);
-          if (bowler.position === 'skip') opponent = `#${r.teamB.skip.bowlerNumber} ${r.teamB.skip.name} (Skip)`;
-          else if (bowler.position === 'second') opponent = `#${r.teamB.second.bowlerNumber} ${r.teamB.second.name} (Second)`;
-          else opponent = `#${r.teamB.lead.bowlerNumber} ${r.teamB.lead.name} (Lead)`;
-        } else if (r.teamB.skip.bowlerNumber === bowler.bowlerNumber ||
-                   r.teamB.second.bowlerNumber === bowler.bowlerNumber ||
-                   r.teamB.lead.bowlerNumber === bowler.bowlerNumber) {
+          teamSide = 'Team A';
+          teammates = teamAPlayers
+            .filter(p => p.bowlerNumber !== bowler.bowlerNumber)
+            .map(p => `#${p.bowlerNumber} ${p.name}`);
+          if (bowler.position === 'skip') {
+            opponent = `#${r.teamB.skip.bowlerNumber} ${r.teamB.skip.name} (Skip)`;
+          } else if (bowler.position === 'second') {
+            opponent = r.teamB.second ? `#${r.teamB.second.bowlerNumber} ${r.teamB.second.name} (Second)` : 'No Opposing Second (Pairs)';
+          } else {
+            opponent = `#${r.teamB.lead.bowlerNumber} ${r.teamB.lead.name} (Lead)`;
+          }
+        } else if (teamBPlayers.some(p => p.bowlerNumber === bowler.bowlerNumber)) {
           foundRink = r.rinkNumber;
-          teamColor = 'Blue';
-          const team = [r.teamB.skip, r.teamB.second, r.teamB.lead].filter(p => p.bowlerNumber !== bowler.bowlerNumber);
-          teammates = team.map(p => `#${p.bowlerNumber} ${p.name}`);
-          if (bowler.position === 'skip') opponent = `#${r.teamA.skip.bowlerNumber} ${r.teamA.skip.name} (Skip)`;
-          else if (bowler.position === 'second') opponent = `#${r.teamA.second.bowlerNumber} ${r.teamA.second.name} (Second)`;
-          else opponent = `#${r.teamA.lead.bowlerNumber} ${r.teamA.lead.name} (Lead)`;
+          teamSide = 'Team B';
+          teammates = teamBPlayers
+            .filter(p => p.bowlerNumber !== bowler.bowlerNumber)
+            .map(p => `#${p.bowlerNumber} ${p.name}`);
+          if (bowler.position === 'skip') {
+            opponent = `#${r.teamA.skip.bowlerNumber} ${r.teamA.skip.name} (Skip)`;
+          } else if (bowler.position === 'second') {
+            opponent = r.teamA.second ? `#${r.teamA.second.bowlerNumber} ${r.teamA.second.name} (Second)` : 'No Opposing Second (Pairs)';
+          } else {
+            opponent = `#${r.teamA.lead.bowlerNumber} ${r.teamA.lead.name} (Lead)`;
+          }
         }
       });
 
       return {
         roundNumber: round.roundNumber,
         rinkNumber: foundRink,
-        teamColor,
+        teamSide,
         teammates,
         opponent
       };
@@ -301,10 +310,8 @@ export const TournamentRoundSelector: React.FC<TournamentRoundSelectorProps> = (
                 >
                   <div className="flex items-center justify-between mb-1.5 border-b border-stone-100 pb-1">
                     <span className="font-bold text-stone-900">Round {item.roundNumber}</span>
-                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                      item.teamColor === 'Red' ? 'bg-rose-100 text-rose-900' : 'bg-sky-100 text-sky-900'
-                    }`}>
-                      Rink {item.rinkNumber} • {item.teamColor}
+                    <span className="px-2 py-0.5 rounded-full font-bold text-[10px] bg-stone-100 text-stone-800 border border-stone-200">
+                      Rink {item.rinkNumber} • {item.teamSide}
                     </span>
                   </div>
 

@@ -38,12 +38,12 @@ export default function App() {
   const [swapSelection, setSwapSelection] = useState<{
     player: Player;
     rinkNumber: number;
-    teamColor: 'red' | 'blue';
+    teamSide: 'teamA' | 'teamB';
     role: 'skip' | 'second' | 'lead';
     roundNumber: number;
   } | null>(null);
 
-  const rinkCount = Math.floor(playerCount / 6);
+  const rinkCount = Math.max(1, Math.ceil(playerCount / 6));
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -93,7 +93,8 @@ export default function App() {
     setTimeout(() => {
       const newTournament = executeTournamentDraw(fresh, newCount, keepPair);
       setTournament(newTournament);
-      showToast(`Updated to ${newCount} bowlers (${Math.floor(newCount / 6)} rinks) with 3-round schedule`);
+      const calculatedRinks = Math.max(1, Math.ceil(newCount / 6));
+      showToast(`Updated to ${newCount} bowlers (${calculatedRinks} ${calculatedRinks === 1 ? 'rink' : 'rinks'}) with 3-round schedule`);
     }, 50);
   };
 
@@ -131,7 +132,7 @@ export default function App() {
   const handleSelectPlayer = (
     player: Player,
     rinkNumber: number,
-    teamColor: 'red' | 'blue',
+    teamSide: 'teamA' | 'teamB',
     role: 'skip' | 'second' | 'lead',
     roundNum?: number
   ) => {
@@ -139,7 +140,7 @@ export default function App() {
 
     if (!swapSelection) {
       // First player selected
-      setSwapSelection({ player, rinkNumber, teamColor, role, roundNumber: effectiveRound });
+      setSwapSelection({ player, rinkNumber, teamSide, role, roundNumber: effectiveRound });
       showToast(`Selected #${player.bowlerNumber} ${player.name} in Round ${effectiveRound}. Now click another bowler to swap.`);
       return;
     }
@@ -176,12 +177,12 @@ export default function App() {
         };
 
         if (r.rinkNumber === swapSelection.rinkNumber) {
-          const team = swapSelection.teamColor === 'red' ? rinkClone.teamA : rinkClone.teamB;
+          const team = swapSelection.teamSide === 'teamA' ? rinkClone.teamA : rinkClone.teamB;
           assignRole(team, swapSelection.role, player);
         }
 
         if (r.rinkNumber === rinkNumber) {
-          const team = teamColor === 'red' ? rinkClone.teamA : rinkClone.teamB;
+          const team = teamSide === 'teamA' ? rinkClone.teamA : rinkClone.teamB;
           assignRole(team, role, swapSelection.player);
         }
 
@@ -256,28 +257,30 @@ export default function App() {
                   <div style="border: 2px solid #000; border-radius: 6px; padding: 8px; page-break-inside: avoid; background: #fff;">
                     <div style="background: #f8f8f8; border-bottom: 1.5px solid #000; margin: -8px -8px 8px -8px; padding: 5px 8px; display: flex; justify-content: space-between; align-items: center;">
                       <span style="font-weight: 900; font-size: 14px;">RINK ${calcRink}</span>
-                      <span style="font-size: 10px; font-weight: bold; text-transform: uppercase;">Triples Match</span>
+                      <span style="font-size: 10px; font-weight: bold; text-transform: uppercase;">
+                        ${(!rink.teamA.second && !rink.teamB.second) ? 'Pairs Match (4 Bowls)' : 'Triples Match'}
+                      </span>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;">
                       <div style="border: 1px solid #999; border-radius: 4px; padding: 5px;">
                         <div style="font-weight: 900; font-size: 11px; border-bottom: 1px solid #ccc; padding-bottom: 2px; margin-bottom: 3px; display: flex; justify-content: space-between;">
-                          <span style="color: #b91c1c;">RED</span>
+                          <span>TEAM A</span>
                           <span>Score: ___</span>
                         </div>
                         <div style="line-height: 1.3;">
                           <div><span style="font-size: 9px; color: #555; font-weight: bold;">Skip:</span> <b>#${rink.teamA.skip.bowlerNumber}</b> ${rink.teamA.skip.name}</div>
-                          <div><span style="font-size: 9px; color: #555; font-weight: bold;">Second:</span> <b>#${rink.teamA.second.bowlerNumber}</b> ${rink.teamA.second.name}</div>
+                          ${rink.teamA.second ? `<div><span style="font-size: 9px; color: #555; font-weight: bold;">Second:</span> <b>#${rink.teamA.second.bowlerNumber}</b> ${rink.teamA.second.name}</div>` : `<div><span style="font-size: 9px; color: #888; font-style: italic;">No Second (Pairs)</span></div>`}
                           <div><span style="font-size: 9px; color: #555; font-weight: bold;">Lead:</span> <b>#${rink.teamA.lead.bowlerNumber}</b> ${rink.teamA.lead.name}</div>
                         </div>
                       </div>
                       <div style="border: 1px solid #999; border-radius: 4px; padding: 5px;">
                         <div style="font-weight: 900; font-size: 11px; border-bottom: 1px solid #ccc; padding-bottom: 2px; margin-bottom: 3px; display: flex; justify-content: space-between;">
-                          <span style="color: #1d4ed8;">BLUE</span>
+                          <span>TEAM B</span>
                           <span>Score: ___</span>
                         </div>
                         <div style="line-height: 1.3;">
                           <div><span style="font-size: 9px; color: #555; font-weight: bold;">Skip:</span> <b>#${rink.teamB.skip.bowlerNumber}</b> ${rink.teamB.skip.name}</div>
-                          <div><span style="font-size: 9px; color: #555; font-weight: bold;">Second:</span> <b>#${rink.teamB.second.bowlerNumber}</b> ${rink.teamB.second.name}</div>
+                          ${rink.teamB.second ? `<div><span style="font-size: 9px; color: #555; font-weight: bold;">Second:</span> <b>#${rink.teamB.second.bowlerNumber}</b> ${rink.teamB.second.name}</div>` : `<div><span style="font-size: 9px; color: #888; font-style: italic;">No Second (Pairs)</span></div>`}
                           <div><span style="font-size: 9px; color: #555; font-weight: bold;">Lead:</span> <b>#${rink.teamB.lead.bowlerNumber}</b> ${rink.teamB.lead.name}</div>
                         </div>
                       </div>
@@ -346,7 +349,7 @@ export default function App() {
     tournament.rounds.forEach((round) => {
       round.rinks.forEach((r) => {
         [r.teamA.skip, r.teamA.second, r.teamA.lead, r.teamB.skip, r.teamB.second, r.teamB.lead].forEach((p) => {
-          if (p.name.toLowerCase().includes(q) || String(p.bowlerNumber).includes(q)) {
+          if (p && (p.name.toLowerCase().includes(q) || String(p.bowlerNumber).includes(q))) {
             count++;
           }
         });

@@ -1,6 +1,6 @@
 {
   "name": "Lawn Bowls Draw",
-  "description": "A simple and intuitive lawn bowls rink draw manager for triples games in multiples of 6 players.",
+  "description": "Lawn bowls rink draw and scorecard manager supporting all even player counts (triples and pairs) with automatic 6N-2 and 6N-4 second player adjustments.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

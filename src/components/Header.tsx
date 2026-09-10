@@ -65,11 +65,12 @@ export const Header: React.FC<HeaderProps> = ({
                     Lawn Bowls
                   </h1>
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-400/20 text-amber-300 border border-amber-400/30 shrink-0">
-                    Triples
+                    {playerCount % 6 === 0 ? 'Triples' : 'Pairs & Triples'}
                   </span>
                 </div>
                 <p className="text-[11px] text-emerald-200/80 truncate">
                   {playerCount} Bowlers • {rinkCount} {rinkCount === 1 ? 'Rink' : 'Rinks'}
+                  {playerCount % 6 !== 0 ? ` • 6N-${playerCount % 6 === 4 ? 2 : 4}` : ''}
                 </p>
               </div>
             </div>
@@ -167,11 +168,12 @@ export const Header: React.FC<HeaderProps> = ({
                   Lawn Bowls Draw
                 </h1>
                 <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                  Triples
+                  {playerCount % 6 === 0 ? 'Triples' : 'Pairs & Triples'}
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-emerald-200/80">
-                {playerCount} Bowlers • {rinkCount} {rinkCount === 1 ? 'Rink' : 'Rinks'} • Multiples of 6
+                {playerCount} Bowlers • {rinkCount} {rinkCount === 1 ? 'Rink' : 'Rinks'}
+                {playerCount % 6 !== 0 ? ` • 6N-${playerCount % 6 === 4 ? 2 : 4}` : ''}
               </p>
             </div>
           </div>

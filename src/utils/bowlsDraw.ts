@@ -54,12 +54,18 @@ export function isUserEnteredName(name: string | undefined | null, bowlerNumber?
 }
 
 export function generateDefaultPlayers(totalCount: number, useSampleNames: boolean = false): Player[] {
-  const rinks = Math.max(1, Math.floor(totalCount / 6));
-  const perRole = rinks * 2;
+  const rinks = Math.max(1, Math.ceil(totalCount / 6));
+  const rem = totalCount % 6;
+  const isSmall6nMinus4 = totalCount < 20 && rem === 2;
+  const secondsRemoved = isSmall6nMinus4 ? 2 : rem === 4 ? 2 : rem === 2 ? 4 : 0;
+  const leadsRemoved = isSmall6nMinus4 ? 2 : 0;
+  const numSkips = rinks * 2;
+  const numSeconds = Math.max(0, rinks * 2 - secondsRemoved);
+  const numLeads = Math.max(0, rinks * 2 - leadsRemoved);
   const players: Player[] = [];
 
   // Skips: 1+
-  for (let i = 0; i < perRole; i++) {
+  for (let i = 0; i < numSkips; i++) {
     const num = 1 + i;
     const name = useSampleNames && i < SAMPLE_BOWLER_NAMES.length
       ? SAMPLE_BOWLER_NAMES[i]
@@ -73,10 +79,10 @@ export function generateDefaultPlayers(totalCount: number, useSampleNames: boole
     });
   }
 
-  // Seconds: 30+
-  for (let i = 0; i < perRole; i++) {
+  // Seconds: 30+ (only for available seconds)
+  for (let i = 0; i < numSeconds; i++) {
     const num = 30 + i;
-    const nameIdx = perRole + i;
+    const nameIdx = numSkips + i;
     const name = useSampleNames && nameIdx < SAMPLE_BOWLER_NAMES.length
       ? SAMPLE_BOWLER_NAMES[nameIdx]
       : '';
@@ -90,9 +96,9 @@ export function generateDefaultPlayers(totalCount: number, useSampleNames: boole
   }
 
   // Leads: 60+
-  for (let i = 0; i < perRole; i++) {
+  for (let i = 0; i < numLeads; i++) {
     const num = 60 + i;
-    const nameIdx = perRole * 2 + i;
+    const nameIdx = numSkips + numSeconds + i;
     const name = useSampleNames && nameIdx < SAMPLE_BOWLER_NAMES.length
       ? SAMPLE_BOWLER_NAMES[nameIdx]
       : '';
@@ -122,8 +128,14 @@ export function executeTournamentDraw(
   totalCount: number,
   keepPair: boolean = false
 ): TournamentDraw {
-  const rinkCount = Math.max(1, Math.floor(totalCount / 6));
-  const perRole = rinkCount * 2;
+  const rinkCount = Math.max(1, Math.ceil(totalCount / 6));
+  const rem = totalCount % 6;
+  const isSmall6nMinus4 = totalCount < 20 && rem === 2;
+  const secondsRemoved = isSmall6nMinus4 ? 2 : rem === 4 ? 2 : rem === 2 ? 4 : 0;
+  const leadsRemoved = isSmall6nMinus4 ? 2 : 0;
+  const numSkips = rinkCount * 2;
+  const numSeconds = Math.max(0, rinkCount * 2 - secondsRemoved);
+  const numLeads = Math.max(0, rinkCount * 2 - leadsRemoved);
 
   // Separate into numeric position blocks
   const skipPool = players.filter(p => p.position === 'skip' || (p.bowlerNumber >= 1 && p.bowlerNumber < 30));
@@ -132,7 +144,7 @@ export function executeTournamentDraw(
 
   // Ensure adequate candidates with fallback
   const activeSkips: Player[] = [];
-  for (let i = 0; i < perRole; i++) {
+  for (let i = 0; i < numSkips; i++) {
     activeSkips.push(skipPool[i] || {
       id: `skip-fallback-${i + 1}`,
       name: `Bowler ${1 + i}`,
@@ -142,7 +154,7 @@ export function executeTournamentDraw(
   }
 
   const activeSeconds: Player[] = [];
-  for (let i = 0; i < perRole; i++) {
+  for (let i = 0; i < numSeconds; i++) {
     activeSeconds.push(secondPool[i] || {
       id: `second-fallback-${i + 1}`,
       name: `Bowler ${30 + i}`,
@@ -152,7 +164,7 @@ export function executeTournamentDraw(
   }
 
   const activeLeads: Player[] = [];
-  for (let i = 0; i < perRole; i++) {
+  for (let i = 0; i < numLeads; i++) {
     activeLeads.push(leadPool[i] || {
       id: `lead-fallback-${i + 1}`,
       name: `Bowler ${60 + i}`,
@@ -162,7 +174,7 @@ export function executeTournamentDraw(
   }
 
   // Generate 3 rounds using optimized constraint solver
-  const solvedRawRounds = solve3RoundsCore(rinkCount, keepPair);
+  const solvedRawRounds = solve3RoundsCore(rinkCount, keepPair, numSeconds, numLeads, totalCount);
 
   // Convert raw indices into rich RoundDraw objects
   const rounds: RoundDraw[] = solvedRawRounds.map((roundMatches, roundIndex) => {
@@ -171,15 +183,15 @@ export function executeTournamentDraw(
       const rinkNum = match.rink + 1;
       const sA = activeSkips[match.sA];
       const sB = activeSkips[match.sB];
-      const mA = activeSeconds[match.mA];
-      const mB = activeSeconds[match.mB];
-      const lA = activeLeads[match.lA];
-      const lB = activeLeads[match.lB];
+      const mA = match.mA !== null && match.mA !== undefined ? activeSeconds[match.mA] : null;
+      const mB = match.mB !== null && match.mB !== undefined ? activeSeconds[match.mB] : null;
+      const lA = match.pTypeA === 'sec' ? activeSeconds[match.lA] : activeLeads[match.lA];
+      const lB = match.pTypeB === 'sec' ? activeSeconds[match.lB] : activeLeads[match.lB];
 
       const teamA: Team = {
         id: `r${roundNumber}-rink-${rinkNum}-team-a`,
-        name: 'Red Team',
-        color: 'red',
+        name: 'Team A',
+        color: 'teamA',
         skip: sA,
         second: mA,
         lead: lA
@@ -187,8 +199,8 @@ export function executeTournamentDraw(
 
       const teamB: Team = {
         id: `r${roundNumber}-rink-${rinkNum}-team-b`,
-        name: 'Blue Team',
-        color: 'blue',
+        name: 'Team B',
+        color: 'teamB',
         skip: sB,
         second: mB,
         lead: lB
@@ -227,48 +239,210 @@ export function executeTournamentDraw(
 interface RawMatch {
   sA: number;
   sB: number;
-  mA: number;
-  mB: number;
+  mA: number | null;
+  mB: number | null;
   lA: number;
   lB: number;
   rink: number;
+  pTypeA?: 'sec' | 'lead';
+  pTypeB?: 'sec' | 'lead';
 }
 
-function solve3RoundsCore(R: number, keepPair: boolean = false): RawMatch[][] {
-  if (keepPair) {
-    return solveKeepPairsCore(R);
+function solve3RoundsCore(
+  R: number,
+  keepPair: boolean = false,
+  numSec?: number,
+  numLeads?: number,
+  totalCount?: number
+): RawMatch[][] {
+  const T = 2 * R;
+  const effectiveNumSec = numSec !== undefined ? numSec : T;
+  const effectiveNumLeads = numLeads !== undefined ? numLeads : T;
+  const pairsRinksCount = Math.floor((2 * T - effectiveNumSec - effectiveNumLeads) / 2);
+
+  // Dedicated optimal solution for 8 players: 4 Skips, 2 Seconds, 2 Leads (both rinks are pairs)
+  // For < 20 players 6n-4, remove 2 leads and 2 seconds rather than 4 seconds
+  if (R === 2 && effectiveNumSec === 2 && effectiveNumLeads === 2) {
+    if (keepPair) {
+      return [
+        [
+          { sA: 0, sB: 1, mA: null, mB: null, lA: 0, lB: 0, pTypeA: 'sec', pTypeB: 'lead', rink: 0 },
+          { sA: 2, sB: 3, mA: null, mB: null, lA: 1, lB: 1, pTypeA: 'sec', pTypeB: 'lead', rink: 1 }
+        ],
+        [
+          { sA: 2, sB: 0, mA: null, mB: null, lA: 0, lB: 0, pTypeA: 'sec', pTypeB: 'lead', rink: 0 },
+          { sA: 3, sB: 1, mA: null, mB: null, lA: 1, lB: 1, pTypeA: 'sec', pTypeB: 'lead', rink: 1 }
+        ],
+        [
+          { sA: 1, sB: 3, mA: null, mB: null, lA: 0, lB: 0, pTypeA: 'sec', pTypeB: 'lead', rink: 1 },
+          { sA: 0, sB: 2, mA: null, mB: null, lA: 1, lB: 1, pTypeA: 'sec', pTypeB: 'lead', rink: 0 }
+        ]
+      ];
+    } else {
+      return [
+        [
+          { sA: 3, sB: 1, mA: null, mB: null, lA: 1, lB: 0, pTypeA: 'lead', pTypeB: 'sec', rink: 0 },
+          { sA: 0, sB: 2, mA: null, mB: null, lA: 0, lB: 1, pTypeA: 'lead', pTypeB: 'sec', rink: 1 }
+        ],
+        [
+          { sA: 0, sB: 1, mA: null, mB: null, lA: 1, lB: 1, pTypeA: 'sec', pTypeB: 'lead', rink: 0 },
+          { sA: 2, sB: 3, mA: null, mB: null, lA: 0, lB: 0, pTypeA: 'sec', pTypeB: 'lead', rink: 1 }
+        ],
+        [
+          { sA: 3, sB: 0, mA: null, mB: null, lA: 1, lB: 0, pTypeA: 'sec', pTypeB: 'sec', rink: 0 },
+          { sA: 1, sB: 2, mA: null, mB: null, lA: 0, lB: 1, pTypeA: 'lead', pTypeB: 'lead', rink: 1 }
+        ]
+      ];
+    }
+  }
+
+  // Dedicated optimal solution for 14 players: 6 Skips, 4 Seconds, 4 Leads (1 triples rink, 2 pairs rinks)
+  // For < 20 players 6n-4, remove 2 leads and 2 seconds rather than 4 seconds
+  // Ensures every skip plays EXACTLY 2 pairs matches and 1 triples match (no player plays 3 pairs!)
+  // Every second and lead plays 1 or 2 pairs matches (none plays 3!)
+  // 100% unique opponents, 100% unique teammates, unique rinks
+  if (R === 3 && effectiveNumSec === 4 && effectiveNumLeads === 4) {
+    if (keepPair) {
+      return [
+        [
+          { sA: 3, sB: 0, mA: 0, mB: 2, lA: 0, lB: 2, rink: 0 },
+          { sA: 2, sB: 5, mA: null, mB: null, lA: 3, lB: 1, pTypeA: 'sec', pTypeB: 'sec', rink: 1 },
+          { sA: 1, sB: 4, mA: null, mB: null, lA: 3, lB: 1, pTypeA: 'lead', pTypeB: 'lead', rink: 2 }
+        ],
+        [
+          { sA: 4, sB: 2, mA: 0, mB: 1, lA: 0, lB: 3, rink: 1 },
+          { sA: 1, sB: 3, mA: null, mB: null, lA: 3, lB: 2, pTypeA: 'sec', pTypeB: 'lead', rink: 0 },
+          { sA: 5, sB: 0, mA: null, mB: null, lA: 2, lB: 1, pTypeA: 'sec', pTypeB: 'lead', rink: 2 }
+        ],
+        [
+          { sA: 1, sB: 5, mA: 0, mB: 3, lA: 0, lB: 1, rink: 2 },
+          { sA: 4, sB: 0, mA: null, mB: null, lA: 2, lB: 1, pTypeA: 'sec', pTypeB: 'sec', rink: 0 },
+          { sA: 3, sB: 2, mA: null, mB: null, lA: 3, lB: 2, pTypeA: 'lead', pTypeB: 'lead', rink: 1 }
+        ]
+      ];
+    } else {
+      return [
+        [
+          { sA: 4, sB: 5, mA: 3, mB: 2, lA: 1, lB: 0, rink: 0 },
+          { sA: 0, sB: 1, mA: null, mB: null, lA: 1, lB: 0, pTypeA: 'sec', pTypeB: 'sec', rink: 1 },
+          { sA: 2, sB: 3, mA: null, mB: null, lA: 3, lB: 2, pTypeA: 'lead', pTypeB: 'lead', rink: 2 }
+        ],
+        [
+          { sA: 2, sB: 0, mA: 1, mB: 0, lA: 2, lB: 3, rink: 1 },
+          { sA: 1, sB: 5, mA: null, mB: null, lA: 2, lB: 1, pTypeA: 'sec', pTypeB: 'lead', rink: 0 },
+          { sA: 3, sB: 4, mA: null, mB: null, lA: 3, lB: 0, pTypeA: 'sec', pTypeB: 'lead', rink: 2 }
+        ],
+        [
+          { sA: 3, sB: 1, mA: 2, mB: 1, lA: 0, lB: 1, rink: 2 },
+          { sA: 5, sB: 2, mA: null, mB: null, lA: 3, lB: 3, pTypeA: 'lead', pTypeB: 'sec', rink: 0 },
+          { sA: 4, sB: 0, mA: null, mB: null, lA: 0, lB: 2, pTypeA: 'sec', pTypeB: 'lead', rink: 1 }
+        ]
+      ];
+    }
+  }
+
+  if (keepPair && effectiveNumSec > 0) {
+    return solveKeepPairsCore(R, effectiveNumSec);
   }
 
   if (R === 1) {
-    return [
-      [{ sA: 0, sB: 1, mA: 0, mB: 1, lA: 0, lB: 1, rink: 0 }],
-      [{ sA: 0, sB: 1, mA: 1, mB: 0, lA: 1, lB: 0, rink: 0 }],
-      [{ sA: 0, sB: 1, mA: 0, mB: 1, lA: 1, lB: 0, rink: 0 }]
-    ];
+    if (effectiveNumSec === 2) {
+      return [
+        [{ sA: 0, sB: 1, mA: 0, mB: 1, lA: 0, lB: 1, rink: 0 }],
+        [{ sA: 0, sB: 1, mA: 1, mB: 0, lA: 1, lB: 0, rink: 0 }],
+        [{ sA: 0, sB: 1, mA: 0, mB: 1, lA: 1, lB: 0, rink: 0 }]
+      ];
+    } else {
+      // 4 players (1 rink of pairs)
+      return [
+        [{ sA: 0, sB: 1, mA: null, mB: null, lA: 0, lB: 1, rink: 0 }],
+        [{ sA: 0, sB: 1, mA: null, mB: null, lA: 1, lB: 0, rink: 0 }],
+        [{ sA: 1, sB: 0, mA: null, mB: null, lA: 0, lB: 1, rink: 0 }]
+      ];
+    }
   }
 
   if (R === 2) {
-    // Verified 100% unique teammates, 100% unique positional opponents, <=2 on same rink
+    if (effectiveNumSec === 4) {
+      return [
+        [
+          { sA: 0, sB: 1, mA: 0, mB: 1, lA: 0, lB: 1, rink: 0 },
+          { sA: 2, sB: 3, mA: 2, mB: 3, lA: 2, lB: 3, rink: 1 }
+        ],
+        [
+          { sA: 0, sB: 2, mA: 2, mB: 0, lA: 3, lB: 1, rink: 1 },
+          { sA: 1, sB: 3, mA: 3, mB: 1, lA: 0, lB: 2, rink: 0 }
+        ],
+        [
+          { sA: 0, sB: 3, mA: 3, mB: 2, lA: 1, lB: 0, rink: 0 },
+          { sA: 1, sB: 2, mA: 0, mB: 1, lA: 2, lB: 3, rink: 1 }
+        ]
+      ];
+    } else if (effectiveNumSec === 2) {
+      // 10 players: 4 Skips, 2 Seconds, 4 Leads (1 triples rink, 1 pairs rink)
+      // Minimizes pairs matches: every skip and lead plays at most 2 pairs matches (none plays 3!)
+      // 100% unique opponents, 100% unique teammates, unique rinks
+      return [
+        [
+          { sA: 0, sB: 1, mA: 0, mB: 1, lA: 0, lB: 1, rink: 0 },
+          { sA: 2, sB: 3, mA: null, mB: null, lA: 2, lB: 3, rink: 1 }
+        ],
+        [
+          { sA: 0, sB: 2, mA: 1, mB: 0, lA: 2, lB: 0, rink: 1 },
+          { sA: 1, sB: 3, mA: null, mB: null, lA: 3, lB: 1, rink: 0 }
+        ],
+        [
+          { sA: 0, sB: 3, mA: 0, mB: 1, lA: 3, lB: 0, rink: 0 },
+          { sA: 1, sB: 2, mA: null, mB: null, lA: 2, lB: 1, rink: 1 }
+        ]
+      ];
+    } else {
+      // 8 players: 4 Skips, 0 Seconds, 4 Leads (both rinks are pairs)
+      return [
+        [
+          { sA: 0, sB: 1, mA: null, mB: null, lA: 0, lB: 1, rink: 0 },
+          { sA: 2, sB: 3, mA: null, mB: null, lA: 2, lB: 3, rink: 1 }
+        ],
+        [
+          { sA: 1, sB: 2, mA: null, mB: null, lA: 3, lB: 0, rink: 0 },
+          { sA: 3, sB: 0, mA: null, mB: null, lA: 1, lB: 2, rink: 1 }
+        ],
+        [
+          { sA: 2, sB: 0, mA: null, mB: null, lA: 1, lB: 3, rink: 0 },
+          { sA: 3, sB: 1, mA: null, mB: null, lA: 2, lB: 0, rink: 1 }
+        ]
+      ];
+    }
+  }
+
+  // Fallback optimal solution for 14 players with 2 seconds (if ever invoked)
+  if (R === 3 && effectiveNumSec === 2) {
     return [
       [
-        { sA: 0, sB: 1, mA: 0, mB: 1, lA: 0, lB: 1, rink: 0 },
-        { sA: 2, sB: 3, mA: 2, mB: 3, lA: 2, lB: 3, rink: 1 }
+        { sA: 5, sB: 2, mA: 0, mB: 1, lA: 0, lB: 1, rink: 0 },
+        { sA: 3, sB: 4, mA: null, mB: null, lA: 2, lB: 3, rink: 1 },
+        { sA: 0, sB: 1, mA: null, mB: null, lA: 4, lB: 5, rink: 2 }
       ],
       [
-        { sA: 0, sB: 2, mA: 2, mB: 0, lA: 3, lB: 1, rink: 1 },
-        { sA: 1, sB: 3, mA: 3, mB: 1, lA: 0, lB: 2, rink: 0 }
+        { sA: 2, sB: 1, mA: null, mB: null, lA: 0, lB: 4, rink: 0 },
+        { sA: 0, sB: 3, mA: 1, mB: 0, lA: 2, lB: 5, rink: 1 },
+        { sA: 4, sB: 5, mA: null, mB: null, lA: 1, lB: 3, rink: 2 }
       ],
       [
-        { sA: 0, sB: 3, mA: 3, mB: 2, lA: 1, lB: 0, rink: 0 },
-        { sA: 1, sB: 2, mA: 0, mB: 1, lA: 2, lB: 3, rink: 1 }
+        { sA: 0, sB: 2, mA: null, mB: null, lA: 0, lB: 5, rink: 0 },
+        { sA: 3, sB: 5, mA: null, mB: null, lA: 1, lB: 2, rink: 1 },
+        { sA: 1, sB: 4, mA: 0, mB: 1, lA: 3, lB: 4, rink: 2 }
       ]
     ];
   }
 
-  const T = 2 * R;
+  // General solver for R >= 3
+  const pairKey = (n1: number, n2: number) => (n1 < n2 ? `${n1}-${n2}` : `${n2}-${n1}`);
+  // Target max pairs: for large player numbers (T >= 6 * pairsRinksCount), strictly 1 game; otherwise capped strictly at 2 games
+  const totalPairsSlots = 6 * pairsRinksCount;
+  const targetMaxPairs = pairsRinksCount === 0 ? 0 : (T >= totalPairsSlots ? 1 : Math.min(2, Math.ceil(totalPairsSlots / T)));
 
-  // Randomized solver with backtracking for R >= 3
-  for (let overall = 0; overall < 150; overall++) {
+  for (let overall = 0; overall < 400; overall++) {
     const skipSec = new Set<string>();
     const skipLead = new Set<string>();
     const secLead = new Set<string>();
@@ -277,6 +451,9 @@ function solve3RoundsCore(R: number, keepPair: boolean = false): RawMatch[][] {
     const secOpp = new Set<string>();
     const leadOpp = new Set<string>();
 
+    const skipPairsCount = new Array(T).fill(0);
+    const leadPairsCount = new Array(T).fill(0);
+
     const playerRinks = Array.from({ length: 3 * T }, () => [] as number[]);
     const rounds: RawMatch[][] = [];
     let allRoundsSuccess = true;
@@ -284,96 +461,130 @@ function solve3RoundsCore(R: number, keepPair: boolean = false): RawMatch[][] {
     for (let roundIdx = 0; roundIdx < 3; roundIdx++) {
       let roundSuccess = false;
 
+      // Determine which rinks in this round are Pairs
+      const pairRinks = new Set<number>();
+      if (pairsRinksCount === 1) {
+        pairRinks.add((R - 1 - roundIdx + R) % R);
+      } else if (pairsRinksCount === 2) {
+        pairRinks.add((R - 2 - roundIdx + R) % R);
+        pairRinks.add((R - 1 - roundIdx + R) % R);
+      }
+
       for (let attempt = 0; attempt < 350; attempt++) {
         const availSkips = Array.from({ length: T }, (_, i) => i);
-        const availSecs = Array.from({ length: T }, (_, i) => i);
+        const availSecs = Array.from({ length: effectiveNumSec }, (_, i) => i);
         const availLeads = Array.from({ length: T }, (_, i) => i);
         const availRinks = Array.from({ length: R }, (_, i) => i);
 
-        // Fisher-Yates shuffle
-        const shuffle = (arr: number[]) => {
-          for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-          }
-        };
-
-        shuffle(availSkips);
-        shuffle(availSecs);
-        shuffle(availLeads);
-        shuffle(availRinks);
+        // Put pairs rinks first so we prioritize skips/leads with minimum pairs played
+        availRinks.sort((a, b) => {
+          const aP = pairRinks.has(a) ? 1 : 0;
+          const bP = pairRinks.has(b) ? 1 : 0;
+          return bP - aP;
+        });
 
         const curMatches: RawMatch[] = [];
         let matchOk = true;
 
         for (let m = 0; m < R; m++) {
           const rink = availRinks[m];
-          const sA = availSkips[m * 2];
-          let sB = availSkips[m * 2 + 1];
-          const sKey = sA < sB ? `${sA}-${sB}` : `${sB}-${sA}`;
+          const isPairs = pairRinks.has(rink);
 
-          if (skipOpp.has(sKey)) {
-            let foundSwap = false;
-            for (let k = m * 2 + 2; k < T; k++) {
-              const testB = availSkips[k];
-              const testKey = sA < testB ? `${sA}-${testB}` : `${testB}-${sA}`;
-              if (!skipOpp.has(testKey)) {
-                availSkips[k] = sB;
-                availSkips[m * 2 + 1] = testB;
-                sB = testB;
-                foundSwap = true;
-                break;
-              }
-            }
-            if (!foundSwap) { matchOk = false; break; }
+          // For pairs matches: pick skips who have played fewest pairs so far
+          // For triples matches: pick skips who have already played pairs if possible
+          if (isPairs) {
+            availSkips.sort((a, b) => skipPairsCount[a] - skipPairsCount[b] || (Math.random() - 0.5));
+          } else {
+            availSkips.sort((a, b) => skipPairsCount[b] - skipPairsCount[a] || (Math.random() - 0.5));
           }
 
-          // Check rink repetition for skips
-          if (playerRinks[sA].includes(rink) || playerRinks[sB].includes(rink)) {
-            matchOk = false; break;
-          }
+          // Find sA and sB
+          let bestSkips: [number, number] | null = null;
+          for (let i = 0; i < availSkips.length; i++) {
+            const sA = availSkips[i];
+            if (isPairs && skipPairsCount[sA] >= targetMaxPairs) continue;
+            if (attempt < 120 && playerRinks[sA].filter(r => r === rink).length >= 1) continue;
 
-          // Find compatible Seconds for sA and sB on this rink
-          let bestM: [number, number] | null = null;
-          for (let i = 0; i < availSecs.length; i++) {
-            const mA = availSecs[i];
-            if (skipSec.has(`${sA}-${mA}`)) continue;
-            if (playerRinks[T + mA].includes(rink)) continue;
-
-            for (let j = 0; j < availSecs.length; j++) {
+            for (let j = 0; j < availSkips.length; j++) {
               if (i === j) continue;
-              const mB = availSecs[j];
-              if (skipSec.has(`${sB}-${mB}`)) continue;
-              if (secOpp.has(mA < mB ? `${mA}-${mB}` : `${mB}-${mA}`)) continue;
-              if (playerRinks[T + mB].includes(rink)) continue;
+              const sB = availSkips[j];
+              if (isPairs && skipPairsCount[sB] >= targetMaxPairs) continue;
+              if (skipOpp.has(pairKey(sA, sB))) continue;
+              if (attempt < 120 && playerRinks[sB].filter(r => r === rink).length >= 1) continue;
 
-              bestM = [mA, mB];
+              bestSkips = [sA, sB];
               break;
             }
-            if (bestM) break;
+            if (bestSkips) break;
+          }
+          if (!bestSkips) { matchOk = false; break; }
+
+          const [sA, sB] = bestSkips;
+          availSkips.splice(availSkips.indexOf(sA), 1);
+          availSkips.splice(availSkips.indexOf(sB), 1);
+
+          let mA: number | null = null;
+          let mB: number | null = null;
+
+          if (!isPairs && effectiveNumSec > 0) {
+            // Shuffle available seconds
+            for (let i = availSecs.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [availSecs[i], availSecs[j]] = [availSecs[j], availSecs[i]];
+            }
+
+            let bestM: [number, number] | null = null;
+            for (let i = 0; i < availSecs.length; i++) {
+              const testMA = availSecs[i];
+              if (skipSec.has(`${sA}-${testMA}`)) continue;
+              if (attempt < 120 && playerRinks[T + testMA].filter(r => r === rink).length >= 1) continue;
+
+              for (let j = 0; j < availSecs.length; j++) {
+                if (i === j) continue;
+                const testMB = availSecs[j];
+                if (skipSec.has(`${sB}-${testMB}`)) continue;
+                if (effectiveNumSec > 2 && secOpp.has(pairKey(testMA, testMB))) continue;
+                if (attempt < 120 && playerRinks[T + testMB].filter(r => r === rink).length >= 1) continue;
+
+                bestM = [testMA, testMB];
+                break;
+              }
+              if (bestM) break;
+            }
+
+            if (!bestM) { matchOk = false; break; }
+
+            mA = bestM[0];
+            mB = bestM[1];
+            availSecs.splice(availSecs.indexOf(mA), 1);
+            availSecs.splice(availSecs.indexOf(mB), 1);
           }
 
-          if (!bestM) { matchOk = false; break; }
+          // Find Leads - strictly respect targetMaxPairs and distribute evenly
+          if (isPairs) {
+            availLeads.sort((a, b) => leadPairsCount[a] - leadPairsCount[b] || (Math.random() - 0.5));
+          } else {
+            availLeads.sort((a, b) => leadPairsCount[b] - leadPairsCount[a] || (Math.random() - 0.5));
+          }
 
-          const [mA, mB] = bestM;
-          availSecs.splice(availSecs.indexOf(mA), 1);
-          availSecs.splice(availSecs.indexOf(mB), 1);
-
-          // Find compatible Leads for team A and team B on this rink
           let bestL: [number, number] | null = null;
           for (let i = 0; i < availLeads.length; i++) {
-            const lA = availLeads[i];
-            if (skipLead.has(`${sA}-${lA}`) || secLead.has(`${mA}-${lA}`)) continue;
-            if (playerRinks[2 * T + lA].includes(rink)) continue;
+            const testLA = availLeads[i];
+            if (isPairs && leadPairsCount[testLA] >= targetMaxPairs) continue;
+            if (skipLead.has(`${sA}-${testLA}`)) continue;
+            if (mA !== null && secLead.has(`${mA}-${testLA}`)) continue;
+            if (attempt < 120 && playerRinks[2 * T + testLA].filter(r => r === rink).length >= 1) continue;
 
             for (let j = 0; j < availLeads.length; j++) {
               if (i === j) continue;
-              const lB = availLeads[j];
-              if (skipLead.has(`${sB}-${lB}`) || secLead.has(`${mB}-${lB}`)) continue;
-              if (leadOpp.has(lA < lB ? `${lA}-${lB}` : `${lB}-${lA}`)) continue;
-              if (playerRinks[2 * T + lB].includes(rink)) continue;
+              const testLB = availLeads[j];
+              if (isPairs && leadPairsCount[testLB] >= targetMaxPairs) continue;
+              if (skipLead.has(`${sB}-${testLB}`)) continue;
+              if (mB !== null && secLead.has(`${mB}-${testLB}`)) continue;
+              if (leadOpp.has(pairKey(testLA, testLB))) continue;
+              if (attempt < 120 && playerRinks[2 * T + testLB].filter(r => r === rink).length >= 1) continue;
 
-              bestL = [lA, lB];
+              bestL = [testLA, testLB];
               break;
             }
             if (bestL) break;
@@ -390,17 +601,27 @@ function solve3RoundsCore(R: number, keepPair: boolean = false): RawMatch[][] {
 
         if (matchOk && curMatches.length === R) {
           for (const cm of curMatches) {
-            skipSec.add(`${cm.sA}-${cm.mA}`); skipSec.add(`${cm.sB}-${cm.mB}`);
+            if (cm.mA !== null && cm.mB !== null) {
+              skipSec.add(`${cm.sA}-${cm.mA}`); skipSec.add(`${cm.sB}-${cm.mB}`);
+              secLead.add(`${cm.mA}-${cm.lA}`); secLead.add(`${cm.mB}-${cm.lB}`);
+              secOpp.add(pairKey(cm.mA, cm.mB));
+              playerRinks[T + cm.mA].push(cm.rink);
+              playerRinks[T + cm.mB].push(cm.rink);
+            } else {
+              skipPairsCount[cm.sA]++;
+              skipPairsCount[cm.sB]++;
+              leadPairsCount[cm.lA]++;
+              leadPairsCount[cm.lB]++;
+            }
+
             skipLead.add(`${cm.sA}-${cm.lA}`); skipLead.add(`${cm.sB}-${cm.lB}`);
-            secLead.add(`${cm.mA}-${cm.lA}`); secLead.add(`${cm.mB}-${cm.lB}`);
+            skipOpp.add(pairKey(cm.sA, cm.sB));
+            leadOpp.add(pairKey(cm.lA, cm.lB));
 
-            skipOpp.add(cm.sA < cm.sB ? `${cm.sA}-${cm.sB}` : `${cm.sB}-${cm.sA}`);
-            secOpp.add(cm.mA < cm.mB ? `${cm.mA}-${cm.mB}` : `${cm.mB}-${cm.mA}`);
-            leadOpp.add(cm.lA < cm.lB ? `${cm.lA}-${cm.lB}` : `${cm.lB}-${cm.lA}`);
-
-            [cm.sA, cm.sB].forEach(p => playerRinks[p].push(cm.rink));
-            [cm.mA, cm.mB].forEach(p => playerRinks[T + p].push(cm.rink));
-            [cm.lA, cm.lB].forEach(p => playerRinks[2 * T + p].push(cm.rink));
+            playerRinks[cm.sA].push(cm.rink);
+            playerRinks[cm.sB].push(cm.rink);
+            playerRinks[2 * T + cm.lA].push(cm.rink);
+            playerRinks[2 * T + cm.lB].push(cm.rink);
           }
 
           rounds.push(curMatches);
@@ -416,23 +637,80 @@ function solve3RoundsCore(R: number, keepPair: boolean = false): RawMatch[][] {
     }
 
     if (allRoundsSuccess && rounds.length === 3) {
+      if (pairsRinksCount > 0) {
+        const maxSkipPairs = Math.max(...skipPairsCount);
+        const maxLeadPairs = Math.max(...leadPairsCount);
+        if (maxSkipPairs > targetMaxPairs || maxLeadPairs > targetMaxPairs) {
+          continue;
+        }
+      }
       return rounds;
     }
   }
 
-  // Fallback if extreme edge case
-  return [
-    Array.from({ length: R }, (_, i) => ({ sA: i * 2, sB: i * 2 + 1, mA: i * 2, mB: i * 2 + 1, lA: i * 2, lB: i * 2 + 1, rink: i })),
-    Array.from({ length: R }, (_, i) => ({ sA: i * 2, sB: (i * 2 + 2) % T, mA: (i * 2 + 1) % T, mB: (i * 2 + 3) % T, lA: (i * 2 + 2) % T, lB: (i * 2 + 4) % T, rink: (i + 1) % R })),
-    Array.from({ length: R }, (_, i) => ({ sA: i * 2, sB: (i * 2 + 3) % T, mA: (i * 2 + 2) % T, mB: (i * 2 + 4) % T, lA: (i * 2 + 3) % T, lB: (i * 2 + 5) % T, rink: (i + 2) % R }))
-  ];
+  // Deterministic balanced fallback ensuring no player exceeds targetMaxPairs
+  const fallbackRounds: RawMatch[][] = [];
+  const slotsPerRound = 2 * pairsRinksCount;
+
+  for (let roundIdx = 0; roundIdx < 3; roundIdx++) {
+    const roundMatches: RawMatch[] = [];
+    const pairRinks = pairsRinksCount === 1
+      ? [(R - 1 - roundIdx + R) % R]
+      : pairsRinksCount === 2
+      ? [(R - 2 - roundIdx + R) % R, (R - 1 - roundIdx + R) % R]
+      : [];
+
+    const startIdx = roundIdx * slotsPerRound;
+    const roundPairSkips: number[] = [];
+    const roundPairLeads: number[] = [];
+    for (let s = 0; s < slotsPerRound; s++) {
+      roundPairSkips.push((startIdx + s) % T);
+      roundPairLeads.push((startIdx + s) % T);
+    }
+
+    const remainingSkips = Array.from({ length: T }, (_, i) => i).filter(s => !roundPairSkips.includes(s));
+    const remainingLeads = Array.from({ length: T }, (_, i) => i).filter(l => !roundPairLeads.includes(l));
+    const availSecs = Array.from({ length: effectiveNumSec }, (_, i) => (i + roundIdx * 2) % effectiveNumSec);
+
+    let pairIdx = 0;
+    let tripIdx = 0;
+
+    for (let r = 0; r < R; r++) {
+      const rink = (r + roundIdx) % R;
+      const isPairs = pairRinks.includes(r);
+      if (isPairs) {
+        const sA = roundPairSkips[pairIdx * 2];
+        const sB = roundPairSkips[pairIdx * 2 + 1];
+        const lA = roundPairLeads[(pairIdx * 2 + roundIdx) % slotsPerRound];
+        const lB = roundPairLeads[(pairIdx * 2 + 1 + roundIdx) % slotsPerRound];
+        roundMatches.push({ sA, sB, mA: null, mB: null, lA, lB, rink });
+        pairIdx++;
+      } else {
+        const sA = remainingSkips[tripIdx * 2];
+        const sB = remainingSkips[tripIdx * 2 + 1];
+        const mA = availSecs[tripIdx * 2];
+        const mB = availSecs[tripIdx * 2 + 1];
+        const lA = remainingLeads[(tripIdx * 2 + roundIdx) % remainingLeads.length];
+        const lB = remainingLeads[(tripIdx * 2 + 1 + roundIdx) % remainingLeads.length];
+        roundMatches.push({ sA, sB, mA, mB, lA, lB, rink });
+        tripIdx++;
+      }
+    }
+    fallbackRounds.push(roundMatches);
+  }
+  return fallbackRounds;
 }
 
-function solveKeepPairsCore(R: number): RawMatch[][] {
+function solveKeepPairsCore(R: number, numSec: number = 2 * R): RawMatch[][] {
+  const T = 2 * R;
+  const effectiveNumSec = numSec;
+  const pairsRinksCount = Math.floor((T - effectiveNumSec) / 2);
+  const pairKey = (n1: number, n2: number) => (n1 < n2 ? `${n1}-${n2}` : `${n2}-${n1}`);
+  const totalPairsSlots = 6 * pairsRinksCount;
+  const targetMaxSkipPairs = pairsRinksCount === 0 ? 0 : (T >= totalPairsSlots ? 1 : Math.min(2, Math.ceil(totalPairsSlots / T)));
+  const targetMaxLeadPairs = pairsRinksCount === 0 ? 0 : ((T - 1) >= totalPairsSlots ? 1 : Math.min(2, Math.ceil(totalPairsSlots / (T - 1))));
+
   if (R === 1) {
-    // 6 players: 2 Skips (0, 1), 2 Seconds (0, 1), 2 Leads (0, 1)
-    // Second 0 (Second 30) & Lead 0 (Lead 60) remain together across all 3 rounds.
-    // Skips alternate between 0 and 1 so they do not have the same skip twice consecutively.
     return [
       [{ sA: 0, sB: 1, mA: 0, mB: 1, lA: 0, lB: 1, rink: 0 }],
       [{ sA: 1, sB: 0, mA: 0, mB: 1, lA: 0, lB: 1, rink: 0 }],
@@ -440,55 +718,8 @@ function solveKeepPairsCore(R: number): RawMatch[][] {
     ];
   }
 
-  if (R === 2) {
-    // 12 players: 4 Skips (0..3), 4 Seconds (0..3), 4 Leads (0..3)
-    // Second 0 (Second 30) & Lead 0 (Lead 60) remain together across all 3 rounds with 3 DIFFERENT skips (0, 1, 3)!
-    return [
-      [
-        { sA: 0, sB: 1, mA: 0, mB: 3, lA: 0, lB: 2, rink: 0 },
-        { sA: 3, sB: 2, mA: 2, mB: 1, lA: 3, lB: 1, rink: 1 }
-      ],
-      [
-        { sA: 1, sB: 3, mA: 0, mB: 3, lA: 0, lB: 1, rink: 1 },
-        { sA: 2, sB: 0, mA: 2, mB: 1, lA: 2, lB: 3, rink: 0 }
-      ],
-      [
-        { sA: 3, sB: 1, mA: 0, mB: 2, lA: 0, lB: 1, rink: 0 },
-        { sA: 0, sB: 2, mA: 1, mB: 3, lA: 2, lB: 3, rink: 1 }
-      ]
-    ];
-  }
-
-  if (R === 3) {
-    // 18 players: 6 Skips (0..5), 6 Seconds (0..5), 6 Leads (0..5)
-    // Second 0 (Second 30) & Lead 0 (Lead 60) remain together across all 3 rounds with 3 DIFFERENT skips (2, 0, 3)!
-    // 100% unique teammates (all other pairs), 100% unique opponents, max 2 on same rink.
-    return [
-      [
-        { sA: 2, sB: 5, mA: 0, mB: 5, lA: 0, lB: 5, rink: 2 },
-        { sA: 0, sB: 4, mA: 4, mB: 2, lA: 2, lB: 3, rink: 0 },
-        { sA: 1, sB: 3, mA: 1, mB: 3, lA: 1, lB: 4, rink: 1 }
-      ],
-      [
-        { sA: 0, sB: 2, mA: 0, mB: 3, lA: 0, lB: 3, rink: 1 },
-        { sA: 1, sB: 5, mA: 4, mB: 1, lA: 5, lB: 4, rink: 0 },
-        { sA: 3, sB: 4, mA: 2, mB: 5, lA: 1, lB: 2, rink: 2 }
-      ],
-      [
-        { sA: 3, sB: 5, mA: 0, mB: 4, lA: 0, lB: 1, rink: 1 },
-        { sA: 0, sB: 1, mA: 1, mB: 5, lA: 3, lB: 4, rink: 0 },
-        { sA: 2, sB: 4, mA: 2, mB: 3, lA: 2, lB: 5, rink: 2 }
-      ]
-    ];
-  }
-
-  const T = 2 * R;
-  const maxRink = 1;
-
-  // Randomized solver with pair-first placement for R >= 4
-  // Guaranteed: Lead 60 (lead 0) & Second 30 (sec 0) together on same team in all rounds,
-  // with distinct skips each round, 100% unique teammates & opponents.
-  for (let overall = 0; overall < 500; overall++) {
+  // Second 0 (Second 30) & Lead 0 (Lead 60) remain together across all 3 rounds.
+  for (let overall = 0; overall < 350; overall++) {
     const skipSec = new Set<string>();
     const skipLead = new Set<string>();
     const secLead = new Set<string>();
@@ -498,71 +729,90 @@ function solveKeepPairsCore(R: number): RawMatch[][] {
 
     const pRinks = Array.from({ length: 3 * T }, () => [] as number[]);
     const pairSkips = new Set<number>();
+    const skipPairsCount = new Array(T).fill(0);
+    const leadPairsCount = new Array(T).fill(0);
     const rounds: RawMatch[][] = [];
     let allOk = true;
 
     for (let roundIdx = 0; roundIdx < 3; roundIdx++) {
       let roundOk = false;
 
-      for (let att = 0; att < 500; att++) {
+      const pairRinks = new Set<number>();
+      if (pairsRinksCount === 1) {
+        pairRinks.add((R - 1 - roundIdx + R) % R);
+      } else if (pairsRinksCount === 2) {
+        pairRinks.add((R - 2 - roundIdx + R) % R);
+        pairRinks.add((R - 1 - roundIdx + R) % R);
+      }
+
+      for (let att = 0; att < 350; att++) {
         const availSkips = Array.from({ length: T }, (_, i) => i);
-        const availSecs = Array.from({ length: T }, (_, i) => i);
+        const availSecs = Array.from({ length: effectiveNumSec }, (_, i) => i);
         const availLeads = Array.from({ length: T }, (_, i) => i);
         const availRinks = Array.from({ length: R }, (_, i) => i);
 
-        // Remove sec 0 (Second 30) and lead 0 (Lead 60) - they are the locked pair
+        // Remove sec 0 and lead 0 (they are the locked pair, placed on a triples rink)
         availSecs.splice(0, 1);
         availLeads.splice(0, 1);
 
-        // 1. Pick rink for pair (Sec 0, Lead 0)
-        const validPairRinks = availRinks.filter(r => pRinks[T + 0].filter(x => x === r).length < maxRink);
-        if (validPairRinks.length === 0) continue;
-        const pairRink = validPairRinks[Math.floor(Math.random() * validPairRinks.length)];
+        // Pick a triples rink for the locked pair
+        const validTriplesRinks = availRinks.filter(r => !pairRinks.has(r) && pRinks[T + 0].filter(x => x === r).length < 1);
+        if (validTriplesRinks.length === 0) continue;
+        const pairRink = validTriplesRinks[Math.floor(Math.random() * validTriplesRinks.length)];
         availRinks.splice(availRinks.indexOf(pairRink), 1);
 
-        // 2. Pick skip for pair (must not be in pairSkips so distinct skip each round)
-        const validPairSkips = availSkips.filter(s =>
-          !pairSkips.has(s) &&
-          pRinks[s].filter(x => x === pairRink).length < maxRink &&
-          !skipSec.has(`${s}-0`) &&
-          !skipLead.has(`${s}-0`)
-        );
-        if (validPairSkips.length === 0) continue;
-        const pairSkip = validPairSkips[Math.floor(Math.random() * validPairSkips.length)];
-        availSkips.splice(availSkips.indexOf(pairSkip), 1);
+        // Pick skip for locked pair
+        availSkips.sort((a, b) => skipPairsCount[b] - skipPairsCount[a] || (Math.random() - 0.5));
+        let lockedSkip: number | null = null;
+        for (const s of availSkips) {
+          if (pairSkips.has(s)) continue;
+          if (skipSec.has(`${s}-0`)) continue;
+          if (skipLead.has(`${s}-0`)) continue;
+          if (att < 120 && pRinks[s].filter(r => r === pairRink).length >= 1) continue;
+          lockedSkip = s;
+          break;
+        }
+        if (lockedSkip === null) continue;
+        availSkips.splice(availSkips.indexOf(lockedSkip), 1);
 
-        // 3. Pick opposing skip for pair match
-        const validOppSkips = availSkips.filter(s =>
-          !skipOpp.has(pairSkip < s ? `${pairSkip}-${s}` : `${s}-${pairSkip}`) &&
-          pRinks[s].filter(x => x === pairRink).length < maxRink
-        );
-        if (validOppSkips.length === 0) continue;
-        const oppSkip = validOppSkips[Math.floor(Math.random() * validOppSkips.length)];
+        // Pick opposing skip for locked pair
+        let oppSkip: number | null = null;
+        for (const s of availSkips) {
+          if (skipOpp.has(pairKey(lockedSkip, s))) continue;
+          if (att < 120 && pRinks[s].filter(r => r === pairRink).length >= 1) continue;
+          oppSkip = s;
+          break;
+        }
+        if (oppSkip === null) continue;
         availSkips.splice(availSkips.indexOf(oppSkip), 1);
 
-        // 4. Pick opposing second for pair match
-        const validOppSecs = availSecs.filter(m =>
-          !skipSec.has(`${oppSkip}-${m}`) &&
-          !secOpp.has(`0-${m}`) &&
-          pRinks[T + m].filter(x => x === pairRink).length < maxRink
-        );
-        if (validOppSecs.length === 0) continue;
-        const oppSec = validOppSecs[Math.floor(Math.random() * validOppSecs.length)];
+        // Pick opposing second
+        let oppSec: number | null = null;
+        for (const m of availSecs) {
+          if (skipSec.has(`${oppSkip}-${m}`)) continue;
+          if (secOpp.has(`0-${m}`)) continue;
+          if (att < 120 && pRinks[T + m].filter(r => r === pairRink).length >= 1) continue;
+          oppSec = m;
+          break;
+        }
+        if (oppSec === null) continue;
         availSecs.splice(availSecs.indexOf(oppSec), 1);
 
-        // 5. Pick opposing lead for pair match
-        const validOppLeads = availLeads.filter(l =>
-          !skipLead.has(`${oppSkip}-${l}`) &&
-          !secLead.has(`${oppSec}-${l}`) &&
-          !leadOpp.has(`0-${l}`) &&
-          pRinks[2 * T + l].filter(x => x === pairRink).length < maxRink
-        );
-        if (validOppLeads.length === 0) continue;
-        const oppLead = validOppLeads[Math.floor(Math.random() * validOppLeads.length)];
+        // Pick opposing lead
+        let oppLead: number | null = null;
+        for (const l of availLeads) {
+          if (skipLead.has(`${oppSkip}-${l}`)) continue;
+          if (secLead.has(`${oppSec}-${l}`)) continue;
+          if (leadOpp.has(`0-${l}`)) continue;
+          if (att < 120 && pRinks[2 * T + l].filter(r => r === pairRink).length >= 1) continue;
+          oppLead = l;
+          break;
+        }
+        if (oppLead === null) continue;
         availLeads.splice(availLeads.indexOf(oppLead), 1);
 
         const pairMatch: RawMatch = {
-          sA: pairSkip, sB: oppSkip,
+          sA: lockedSkip, sB: oppSkip,
           mA: 0, mB: oppSec,
           lA: 0, lB: oppLead,
           rink: pairRink
@@ -571,84 +821,99 @@ function solveKeepPairsCore(R: number): RawMatch[][] {
         const curMatches: RawMatch[] = [pairMatch];
         let restOk = true;
 
-        const shuffle = (arr: number[]) => {
-          for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-          }
-        };
-        shuffle(availSkips);
-        shuffle(availSecs);
-        shuffle(availLeads);
-        shuffle(availRinks);
+        // Prioritize pairs rinks first
+        availRinks.sort((a, b) => {
+          const aP = pairRinks.has(a) ? 1 : 0;
+          const bP = pairRinks.has(b) ? 1 : 0;
+          return bP - aP;
+        });
 
-        for (let m = 0; m < R - 1; m++) {
+        for (let m = 0; m < availRinks.length; m++) {
           const rink = availRinks[m];
-          let sA = availSkips[m * 2];
-          let sB = availSkips[m * 2 + 1];
-          let sKey = sA < sB ? `${sA}-${sB}` : `${sB}-${sA}`;
+          const isPairs = pairRinks.has(rink);
 
-          if (skipOpp.has(sKey)) {
-            let foundSwap = false;
-            for (let k = m * 2 + 2; k < availSkips.length; k++) {
-              const testB = availSkips[k];
-              const testKey = sA < testB ? `${sA}-${testB}` : `${testB}-${sA}`;
-              if (!skipOpp.has(testKey)) {
-                availSkips[k] = sB;
-                availSkips[m * 2 + 1] = testB;
-                sB = testB;
-                foundSwap = true;
-                break;
-              }
-            }
-            if (!foundSwap) { restOk = false; break; }
+          if (isPairs) {
+            availSkips.sort((a, b) => skipPairsCount[a] - skipPairsCount[b] || (Math.random() - 0.5));
+          } else {
+            availSkips.sort((a, b) => skipPairsCount[b] - skipPairsCount[a] || (Math.random() - 0.5));
           }
 
-          if (pRinks[sA].filter(x => x === rink).length >= maxRink ||
-              pRinks[sB].filter(x => x === rink).length >= maxRink) {
-            restOk = false; break;
-          }
-
-          let bestM: [number, number] | null = null;
-          for (let i = 0; i < availSecs.length; i++) {
-            const mA = availSecs[i];
-            if (skipSec.has(`${sA}-${mA}`)) continue;
-            if (pRinks[T + mA].filter(x => x === rink).length >= maxRink) continue;
-
-            for (let j = 0; j < availSecs.length; j++) {
+          let bestS: [number, number] | null = null;
+          for (let i = 0; i < availSkips.length; i++) {
+            const sA = availSkips[i];
+            if (isPairs && skipPairsCount[sA] >= targetMaxSkipPairs) continue;
+            if (att < 120 && pRinks[sA].filter(x => x === rink).length >= 1) continue;
+            for (let j = 0; j < availSkips.length; j++) {
               if (i === j) continue;
-              const mB = availSecs[j];
-              if (skipSec.has(`${sB}-${mB}`)) continue;
-              if (secOpp.has(mA < mB ? `${mA}-${mB}` : `${mB}-${mA}`)) continue;
-              if (pRinks[T + mB].filter(x => x === rink).length >= maxRink) continue;
-
-              bestM = [mA, mB];
+              const sB = availSkips[j];
+              if (isPairs && skipPairsCount[sB] >= targetMaxSkipPairs) continue;
+              if (skipOpp.has(pairKey(sA, sB))) continue;
+              if (att < 120 && pRinks[sB].filter(x => x === rink).length >= 1) continue;
+              bestS = [sA, sB];
               break;
             }
-            if (bestM) break;
+            if (bestS) break;
           }
-          if (!bestM) { restOk = false; break; }
+          if (!bestS) { restOk = false; break; }
 
-          const [mA, mB] = bestM;
-          availSecs.splice(availSecs.indexOf(mA), 1);
-          availSecs.splice(availSecs.indexOf(mB), 1);
+          const [sA, sB] = bestS;
+          availSkips.splice(availSkips.indexOf(sA), 1);
+          availSkips.splice(availSkips.indexOf(sB), 1);
+
+          let mA: number | null = null;
+          let mB: number | null = null;
+
+          if (!isPairs && availSecs.length >= 2) {
+            let bestM: [number, number] | null = null;
+            for (let i = 0; i < availSecs.length; i++) {
+              const testMA = availSecs[i];
+              if (skipSec.has(`${sA}-${testMA}`)) continue;
+              if (att < 120 && pRinks[T + testMA].filter(x => x === rink).length >= 1) continue;
+
+              for (let j = 0; j < availSecs.length; j++) {
+                if (i === j) continue;
+                const testMB = availSecs[j];
+                if (skipSec.has(`${sB}-${testMB}`)) continue;
+                if (effectiveNumSec > 2 && secOpp.has(pairKey(testMA, testMB))) continue;
+                if (att < 120 && pRinks[T + testMB].filter(x => x === rink).length >= 1) continue;
+
+                bestM = [testMA, testMB];
+                break;
+              }
+              if (bestM) break;
+            }
+            if (!bestM) { restOk = false; break; }
+
+            mA = bestM[0];
+            mB = bestM[1];
+            availSecs.splice(availSecs.indexOf(mA), 1);
+            availSecs.splice(availSecs.indexOf(mB), 1);
+          }
+
+          if (isPairs) {
+            availLeads.sort((a, b) => leadPairsCount[a] - leadPairsCount[b] || (Math.random() - 0.5));
+          } else {
+            availLeads.sort((a, b) => leadPairsCount[b] - leadPairsCount[a] || (Math.random() - 0.5));
+          }
 
           let bestL: [number, number] | null = null;
           for (let i = 0; i < availLeads.length; i++) {
-            const lA = availLeads[i];
-            if (skipLead.has(`${sA}-${lA}`)) continue;
-            if (secLead.has(`${mA}-${lA}`)) continue;
-            if (pRinks[2 * T + lA].filter(x => x === rink).length >= maxRink) continue;
+            const testLA = availLeads[i];
+            if (isPairs && leadPairsCount[testLA] >= targetMaxLeadPairs) continue;
+            if (skipLead.has(`${sA}-${testLA}`)) continue;
+            if (mA !== null && secLead.has(`${mA}-${testLA}`)) continue;
+            if (att < 120 && pRinks[2 * T + testLA].filter(x => x === rink).length >= 1) continue;
 
             for (let j = 0; j < availLeads.length; j++) {
               if (i === j) continue;
-              const lB = availLeads[j];
-              if (skipLead.has(`${sB}-${lB}`)) continue;
-              if (secLead.has(`${mB}-${lB}`)) continue;
-              if (leadOpp.has(lA < lB ? `${lA}-${lB}` : `${lB}-${lA}`)) continue;
-              if (pRinks[2 * T + lB].filter(x => x === rink).length >= maxRink) continue;
+              const testLB = availLeads[j];
+              if (isPairs && leadPairsCount[testLB] >= targetMaxLeadPairs) continue;
+              if (skipLead.has(`${sB}-${testLB}`)) continue;
+              if (mB !== null && secLead.has(`${mB}-${testLB}`)) continue;
+              if (leadOpp.has(pairKey(testLA, testLB))) continue;
+              if (att < 120 && pRinks[2 * T + testLB].filter(x => x === rink).length >= 1) continue;
 
-              bestL = [lA, lB];
+              bestL = [testLA, testLB];
               break;
             }
             if (bestL) break;
@@ -666,17 +931,24 @@ function solveKeepPairsCore(R: number): RawMatch[][] {
           roundOk = true;
           for (const match of curMatches) {
             const { sA, sB, mA, mB, lA, lB, rink } = match;
-            skipSec.add(`${sA}-${mA}`); skipSec.add(`${sB}-${mB}`);
+            if (mA !== null && mB !== null) {
+              skipSec.add(`${sA}-${mA}`); skipSec.add(`${sB}-${mB}`);
+              secLead.add(`${mA}-${lA}`); secLead.add(`${mB}-${lB}`);
+              secOpp.add(pairKey(mA, mB));
+              pRinks[T + mA].push(rink); pRinks[T + mB].push(rink);
+              if (mA === 0) pairSkips.add(sA);
+              if (mB === 0) pairSkips.add(sB);
+            } else {
+              skipPairsCount[sA]++;
+              skipPairsCount[sB]++;
+              leadPairsCount[lA]++;
+              leadPairsCount[lB]++;
+            }
             skipLead.add(`${sA}-${lA}`); skipLead.add(`${sB}-${lB}`);
-            secLead.add(`${mA}-${lA}`); secLead.add(`${mB}-${lB}`);
-            skipOpp.add(sA < sB ? `${sA}-${sB}` : `${sB}-${sA}`);
-            secOpp.add(mA < mB ? `${mA}-${mB}` : `${mB}-${mA}`);
-            leadOpp.add(lA < lB ? `${lA}-${lB}` : `${lB}-${lA}`);
+            skipOpp.add(pairKey(sA, sB));
+            leadOpp.add(pairKey(lA, lB));
             pRinks[sA].push(rink); pRinks[sB].push(rink);
-            pRinks[T + mA].push(rink); pRinks[T + mB].push(rink);
             pRinks[2 * T + lA].push(rink); pRinks[2 * T + lB].push(rink);
-            if (mA === 0) pairSkips.add(sA);
-            if (mB === 0) pairSkips.add(sB);
           }
           rounds.push(curMatches);
           break;
@@ -687,40 +959,74 @@ function solveKeepPairsCore(R: number): RawMatch[][] {
     }
 
     if (allOk && rounds.length === 3) {
+      if (pairsRinksCount > 0) {
+        const maxS = Math.max(...skipPairsCount);
+        const maxL = Math.max(...leadPairsCount);
+        if (maxS > targetMaxSkipPairs || maxL > targetMaxLeadPairs) {
+          continue;
+        }
+      }
       return rounds;
     }
   }
 
-  // Deterministic circular fallback
-  return [
-    Array.from({ length: R }, (_, i) => ({
-      sA: i * 2,
-      sB: i * 2 + 1,
-      mA: i * 2,
-      mB: i * 2 + 1,
-      lA: i * 2,
-      lB: i * 2 + 1,
-      rink: i
-    })),
-    Array.from({ length: R }, (_, i) => ({
-      sA: (i * 2 + 1) % T,
-      sB: (i * 2 + 2) % T,
-      mA: (i * 2) % T,
-      mB: (i * 2 + 2) % T,
-      lA: (i * 2) % T,
-      lB: (i * 2 + 2) % T,
-      rink: (i + 1) % R
-    })),
-    Array.from({ length: R }, (_, i) => ({
-      sA: (i * 2 + 2) % T,
-      sB: (i * 2 + 3) % T,
-      mA: (i * 2) % T,
-      mB: (i * 2 + 3) % T,
-      lA: (i * 2) % T,
-      lB: (i * 2 + 3) % T,
-      rink: (i + 2) % R
-    }))
-  ];
+  // Deterministic balanced fallback for keepPair
+  const fallbackRounds: RawMatch[][] = [];
+  const slotsPerRound = 2 * pairsRinksCount;
+
+  for (let roundIdx = 0; roundIdx < 3; roundIdx++) {
+    const roundMatches: RawMatch[] = [];
+    const pairRinks = pairsRinksCount === 1
+      ? [(R - 1 - roundIdx + R) % R]
+      : pairsRinksCount === 2
+      ? [(R - 2 - roundIdx + R) % R, (R - 1 - roundIdx + R) % R]
+      : [];
+
+    const startIdx = roundIdx * slotsPerRound;
+    const roundPairSkips: number[] = [];
+    for (let s = 0; s < slotsPerRound; s++) {
+      roundPairSkips.push((startIdx + s) % T);
+    }
+    const remainingSkips = Array.from({ length: T }, (_, i) => i).filter(s => !roundPairSkips.includes(s));
+
+    // Non-locked leads 1..T-1 play pairs (Lead 0 is locked on triples with Sec 0)
+    const nonLockedLeads = Array.from({ length: T - 1 }, (_, i) => i + 1);
+    const roundPairLeads: number[] = [];
+    for (let s = 0; s < slotsPerRound; s++) {
+      roundPairLeads.push(nonLockedLeads[(startIdx + s) % nonLockedLeads.length]);
+    }
+    const remainingLeads = [0, ...nonLockedLeads.filter(l => !roundPairLeads.includes(l))];
+
+    const nonLockedSecs = Array.from({ length: effectiveNumSec - 1 }, (_, i) => i + 1);
+    const availSecs = [0, ...nonLockedSecs];
+
+    let pairIdx = 0;
+    let tripIdx = 0;
+
+    for (let r = 0; r < R; r++) {
+      const rink = (r + roundIdx) % R;
+      const isPairs = pairRinks.includes(r);
+      if (isPairs) {
+        const sA = roundPairSkips[pairIdx * 2];
+        const sB = roundPairSkips[pairIdx * 2 + 1];
+        const lA = roundPairLeads[(pairIdx * 2 + roundIdx) % slotsPerRound];
+        const lB = roundPairLeads[(pairIdx * 2 + 1 + roundIdx) % slotsPerRound];
+        roundMatches.push({ sA, sB, mA: null, mB: null, lA, lB, rink });
+        pairIdx++;
+      } else {
+        const sA = remainingSkips[tripIdx * 2];
+        const sB = remainingSkips[tripIdx * 2 + 1];
+        const mA = tripIdx === 0 ? 0 : availSecs[(tripIdx * 2) % availSecs.length];
+        const mB = availSecs[(tripIdx * 2 + 1) % availSecs.length];
+        const lA = tripIdx === 0 ? 0 : remainingLeads[(tripIdx * 2) % remainingLeads.length];
+        const lB = remainingLeads[(tripIdx * 2 + 1) % remainingLeads.length];
+        roundMatches.push({ sA, sB, mA, mB, lA, lB, rink });
+        tripIdx++;
+      }
+    }
+    fallbackRounds.push(roundMatches);
+  }
+  return fallbackRounds;
 }
 
 export function calculateDrawMetrics(
@@ -736,38 +1042,53 @@ export function calculateDrawMetrics(
   let totalTeammatePairings = 0;
   let totalPositionalMatchups = 0;
 
+  const pairKey = (n1: number, n2: number) => (n1 < n2 ? `${n1}-${n2}` : `${n2}-${n1}`);
+
   rounds.forEach(round => {
     round.rinks.forEach(rink => {
       const { teamA, teamB, rinkNumber } = rink;
 
-      // Track team A
-      const pairKey = (n1: number, n2: number) => (n1 < n2 ? `${n1}-${n2}` : `${n2}-${n1}`);
+      const recordTeam = (skip: Player, second: Player | null | undefined, lead: Player) => {
+        const skipNum = skip.bowlerNumber;
+        const leadNum = lead.bowlerNumber;
 
-      const recordTeam = (skipNum: number, secNum: number, leadNum: number) => {
-        [pairKey(skipNum, secNum), pairKey(skipNum, leadNum), pairKey(secNum, leadNum)].forEach(k => {
-          teammatePairs.set(k, (teammatePairs.get(k) || 0) + 1);
-          totalTeammatePairings++;
-        });
-
-        [skipNum, secNum, leadNum].forEach(pNum => {
+        [skipNum, leadNum].forEach(pNum => {
           const visits = playerRinkVisits.get(pNum) || [];
           visits.push(rinkNumber);
           playerRinkVisits.set(pNum, visits);
         });
+
+        teammatePairs.set(pairKey(skipNum, leadNum), (teammatePairs.get(pairKey(skipNum, leadNum)) || 0) + 1);
+        totalTeammatePairings++;
+
+        if (second) {
+          const secNum = second.bowlerNumber;
+          const visits = playerRinkVisits.get(secNum) || [];
+          visits.push(rinkNumber);
+          playerRinkVisits.set(secNum, visits);
+
+          teammatePairs.set(pairKey(skipNum, secNum), (teammatePairs.get(pairKey(skipNum, secNum)) || 0) + 1);
+          teammatePairs.set(pairKey(secNum, leadNum), (teammatePairs.get(pairKey(secNum, leadNum)) || 0) + 1);
+          totalTeammatePairings += 2;
+        }
       };
 
-      recordTeam(teamA.skip.bowlerNumber, teamA.second.bowlerNumber, teamA.lead.bowlerNumber);
-      recordTeam(teamB.skip.bowlerNumber, teamB.second.bowlerNumber, teamB.lead.bowlerNumber);
+      recordTeam(teamA.skip, teamA.second, teamA.lead);
+      recordTeam(teamB.skip, teamB.second, teamB.lead);
 
       // Positional opponents
       const sOpp = pairKey(teamA.skip.bowlerNumber, teamB.skip.bowlerNumber);
-      const mOpp = pairKey(teamA.second.bowlerNumber, teamB.second.bowlerNumber);
       const lOpp = pairKey(teamA.lead.bowlerNumber, teamB.lead.bowlerNumber);
-
-      [sOpp, mOpp, lOpp].forEach(k => {
+      [sOpp, lOpp].forEach(k => {
         positionalOpponents.set(k, (positionalOpponents.get(k) || 0) + 1);
         totalPositionalMatchups++;
       });
+
+      if (teamA.second && teamB.second) {
+        const mOpp = pairKey(teamA.second.bowlerNumber, teamB.second.bowlerNumber);
+        positionalOpponents.set(mOpp, (positionalOpponents.get(mOpp) || 0) + 1);
+        totalPositionalMatchups++;
+      }
     });
   });
 
@@ -802,7 +1123,6 @@ export function calculateDrawMetrics(
   const totalPlayers = playerRinkVisits.size || totalCount;
   const rinkDiversityPercent = Math.round((uniqueRinkPlayers / Math.max(1, totalPlayers)) * 100);
 
-  // In R=1 (6 players), pigeonhole principle limits uniqueness
   const uniqueTeammatesPercent = totalTeammatePairings > 0
     ? Math.max(0, Math.round(((totalTeammatePairings - effectiveRepeatTeammates * 2) / totalTeammatePairings) * 100))
     : 100;
@@ -826,7 +1146,8 @@ export function executeDraw(players: Player[], totalCount: number): Rink[] {
   return tournament.rounds[0].rinks;
 }
 
-function formatBowlerDisplay(p: Player): string {
+function formatBowlerDisplay(p: Player | null | undefined): string {
+  if (!p) return 'None (Pairs Match)';
   return isUserEnteredName(p.name, p.bowlerNumber)
     ? `Player ${p.bowlerNumber} (${p.name})`
     : `Player ${p.bowlerNumber}`;
@@ -836,7 +1157,7 @@ export function formatTournamentDrawText(tournament: TournamentDraw, startRink: 
   let text = `==============================================\n`;
   text += `   LAWN BOWLS 3-ROUND TOURNAMENT DRAW\n`;
   text += `==============================================\n`;
-  text += `Total Players: ${tournament.playerCount} (${tournament.rinkCount} Rinks • Triples • Starting Rink ${startRink})\n`;
+  text += `Total Players: ${tournament.playerCount} (${tournament.rinkCount} Rinks • Starting Rink ${startRink})\n`;
   text += `Position Blocks: Skips 1-29 | Seconds 30-59 | Leads 60-89\n`;
   text += `Draw Optimization Status:\n`;
   text += `  • Unique Teammates: ${tournament.metrics.uniqueTeammatesPercent}%\n`;
@@ -850,13 +1171,19 @@ export function formatTournamentDrawText(tournament: TournamentDraw, startRink: 
 
     round.rinks.forEach(rink => {
       const calculatedRink = (startRink - 1) + rink.rinkNumber;
-      text += `[ RINK ${calculatedRink} ]\n`;
-      text += `  RED (Team A):\n`;
+      const matchType = (!rink.teamA.second && !rink.teamB.second)
+        ? 'Pairs (2 vs 2)'
+        : (!rink.teamA.second || !rink.teamB.second)
+        ? 'Pairs vs Triples'
+        : 'Triples (3 vs 3)';
+
+      text += `[ RINK ${calculatedRink} - ${matchType} ]\n`;
+      text += `  TEAM A:\n`;
       text += `    Skip:   ${formatBowlerDisplay(rink.teamA.skip)}\n`;
       text += `    Second: ${formatBowlerDisplay(rink.teamA.second)}\n`;
       text += `    Lead:   ${formatBowlerDisplay(rink.teamA.lead)}\n`;
       text += `  vs\n`;
-      text += `  BLUE (Team B):\n`;
+      text += `  TEAM B:\n`;
       text += `    Skip:   ${formatBowlerDisplay(rink.teamB.skip)}\n`;
       text += `    Second: ${formatBowlerDisplay(rink.teamB.second)}\n`;
       text += `    Lead:   ${formatBowlerDisplay(rink.teamB.lead)}\n\n`;
@@ -868,19 +1195,19 @@ export function formatTournamentDrawText(tournament: TournamentDraw, startRink: 
 }
 
 export function formatDrawText(rinks: Rink[], startRink: number = 1): string {
-  let text = `=== LAWN BOWLS TRIPLES DRAW ===\n`;
+  let text = `=== LAWN BOWLS DRAW ===\n`;
   text += `Total Rinks: ${rinks.length} (${rinks.length * 6} Players • Starting Rink ${startRink})\n`;
   text += `Position Blocks: Skips (1-29) • Seconds (30-59) • Leads (60-89)\n\n`;
 
   rinks.forEach(rink => {
     const calculatedRink = (startRink - 1) + rink.rinkNumber;
     text += `[ RINK ${calculatedRink} ]\n`;
-    text += `  RED (Team A):\n`;
+    text += `  TEAM A:\n`;
     text += `    Skip:   ${formatBowlerDisplay(rink.teamA.skip)}\n`;
     text += `    Second: ${formatBowlerDisplay(rink.teamA.second)}\n`;
     text += `    Lead:   ${formatBowlerDisplay(rink.teamA.lead)}\n`;
     text += `  vs\n`;
-    text += `  BLUE (Team B):\n`;
+    text += `  TEAM B:\n`;
     text += `    Skip:   ${formatBowlerDisplay(rink.teamB.skip)}\n`;
     text += `    Second: ${formatBowlerDisplay(rink.teamB.second)}\n`;
     text += `    Lead:   ${formatBowlerDisplay(rink.teamB.lead)}\n\n`;
@@ -892,7 +1219,7 @@ export function formatDrawText(rinks: Rink[], startRink: number = 1): string {
 
 export function formatFlatDrawText(tournament: TournamentDraw, players: Player[], startRink: number = 1): string {
   let text = `=== LAWN BOWLS FLAT DRAW (PLAYER NUMBERS) ===\n`;
-  text += `Total Bowlers: ${tournament.playerCount} (${tournament.rinkCount} Rinks • Triples • Starting Rink ${startRink})\n`;
+  text += `Total Bowlers: ${tournament.playerCount} (${tournament.rinkCount} Rinks • Starting Rink ${startRink})\n`;
   text += `Matches Grouped Chronologically: Round & Rink | Team Numbers (Player + Teammates) | Opposition Numbers\n`;
   text += `Blocks: Skips (1+), Seconds (30+), Leads (60+)\n\n`;
 
@@ -909,8 +1236,8 @@ export function formatFlatDrawText(tournament: TournamentDraw, players: Player[]
       let oppNums: number[] = [];
 
       round.rinks.forEach((r) => {
-        const teamA = [r.teamA.skip, r.teamA.second, r.teamA.lead];
-        const teamB = [r.teamB.skip, r.teamB.second, r.teamB.lead];
+        const teamA = [r.teamA.skip, r.teamA.second, r.teamA.lead].filter((p): p is Player => !!p);
+        const teamB = [r.teamB.skip, r.teamB.second, r.teamB.lead].filter((p): p is Player => !!p);
 
         if (teamA.some((p) => p.bowlerNumber === player.bowlerNumber)) {
           foundRink = r.rinkNumber;

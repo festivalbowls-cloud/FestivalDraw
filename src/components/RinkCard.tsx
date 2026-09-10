@@ -7,7 +7,7 @@ interface RinkCardProps {
   rink: Rink;
   startRink?: number;
   selectedPlayerId: string | null;
-  onSelectPlayer: (player: Player, rinkNumber: number, teamColor: 'red' | 'blue', role: 'skip' | 'second' | 'lead') => void;
+  onSelectPlayer: (player: Player, rinkNumber: number, teamSide: 'teamA' | 'teamB', role: 'skip' | 'second' | 'lead') => void;
   searchQuery: string;
 }
 
@@ -26,7 +26,7 @@ export const RinkCard: React.FC<RinkCardProps> = ({
 
   const renderPlayerRow = (
     player: Player,
-    teamColor: 'red' | 'blue',
+    teamSide: 'teamA' | 'teamB',
     role: 'skip' | 'second' | 'lead',
     roleLabel: string,
     roleIcon: React.ReactNode,
@@ -35,13 +35,15 @@ export const RinkCard: React.FC<RinkCardProps> = ({
     const isSelected = selectedPlayerId === player.id;
     const isHighlighted = isSearchMatch(player.name);
 
-    // Block styling based on position range
+    // Block styling based on position range (1+ Skips amber, 30+ Seconds sky, 60+ Leads emerald)
     const numberBlockBadge =
-      role === 'skip'
+      player.bowlerNumber < 30
         ? 'bg-amber-100 text-amber-900 border-amber-300'
-        : role === 'second'
+        : player.bowlerNumber < 60
         ? 'bg-sky-100 text-sky-900 border-sky-300'
         : 'bg-emerald-100 text-emerald-900 border-emerald-300';
+
+    const blockType = player.bowlerNumber < 30 ? 'SKIP' : player.bowlerNumber < 60 ? 'SECOND' : 'LEAD';
 
     const displayName = isUserEnteredName(player.name, player.bowlerNumber)
       ? player.name
@@ -50,7 +52,7 @@ export const RinkCard: React.FC<RinkCardProps> = ({
     return (
       <button
         type="button"
-        onClick={() => onSelectPlayer(player, rink.rinkNumber, teamColor, role)}
+        onClick={() => onSelectPlayer(player, rink.rinkNumber, teamSide, role)}
         className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition cursor-pointer border ${
           isSelected
             ? 'bg-amber-100/90 border-amber-500 shadow-sm ring-2 ring-amber-400'
@@ -58,13 +60,13 @@ export const RinkCard: React.FC<RinkCardProps> = ({
             ? 'bg-emerald-100/80 border-emerald-500 ring-2 ring-emerald-400'
             : 'bg-white hover:bg-stone-50 border-stone-200/80'
         }`}
-        title={`Click to swap ${displayName} (Position: ${role.toUpperCase()})`}
+        title={`Click to swap ${displayName} (Block: ${blockType})`}
       >
         <div className="flex items-center gap-2 min-w-0">
           {/* Positional Number Badge */}
           <span
             className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs font-heading border shrink-0 ${numberBlockBadge}`}
-            title={`Bowler #${player.bowlerNumber} (${role.toUpperCase()} block)`}
+            title={`Bowler #${player.bowlerNumber} (${blockType} block)`}
           >
             #{player.bowlerNumber}
           </span>
@@ -107,23 +109,27 @@ export const RinkCard: React.FC<RinkCardProps> = ({
           </h3>
         </div>
         <span className="text-[11px] font-medium text-emerald-200/90 bg-emerald-950/40 px-2 py-0.5 rounded-full">
-          Triples (3 vs 3)
+          {(!rink.teamA.second && !rink.teamB.second)
+            ? 'Pairs (2 vs 2)'
+            : (!rink.teamA.second || !rink.teamB.second)
+            ? 'Pairs vs Triples'
+            : 'Triples (3 vs 3)'}
         </span>
       </div>
 
       {/* Teams Grid */}
       <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
         
-        {/* Red Team */}
-        <div className="flex flex-col bg-red-50/40 rounded-xl p-3 border border-red-200/70">
-          <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-red-200/50">
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-red-600 inline-block shadow-xs"></span>
-              <span className="font-bold text-xs uppercase tracking-wider text-red-950">
-                Red Stickers
+        {/* Team A */}
+        <div className="flex flex-col bg-stone-50/70 rounded-xl p-3 border border-stone-200">
+          <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-stone-200">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-700 inline-block"></span>
+              <span className="font-bold text-xs uppercase tracking-wider text-stone-900 font-heading">
+                Team A
               </span>
             </div>
-            <span className="text-[10px] font-semibold bg-red-100 text-red-800 px-1.5 py-0.5 rounded border border-red-200" title="Delivers the Jack and bowl first on End 1">
+            <span className="text-[10px] font-semibold bg-stone-200/80 text-stone-700 px-1.5 py-0.5 rounded border border-stone-300" title="Delivers the Jack and bowl first on End 1">
               Holds Mat (End 1)
             </span>
           </div>
@@ -131,67 +137,84 @@ export const RinkCard: React.FC<RinkCardProps> = ({
           <div className="space-y-1.5 flex-1">
             {renderPlayerRow(
               rink.teamA.skip,
-              'red',
+              'teamA',
               'skip',
               'Skip (Captain)',
               <Crown className="w-3.5 h-3.5 text-amber-700" />,
               'bg-amber-100'
             )}
-            {renderPlayerRow(
-              rink.teamA.second,
-              'red',
-              'second',
-              'Second',
-              <Circle className="w-3.5 h-3.5 text-blue-700" />,
-              'bg-blue-100'
+            {rink.teamA.second ? (
+              renderPlayerRow(
+                rink.teamA.second,
+                'teamA',
+                'second',
+                'Second',
+                <Circle className="w-3.5 h-3.5 text-blue-700" />,
+                'bg-blue-100'
+              )
+            ) : (
+              <div className="flex items-center justify-center p-2 rounded-lg border border-dashed border-stone-300 bg-white/70 text-stone-600 text-xs font-semibold italic">
+                Pairs Match (No Second — 4 Bowls each)
+              </div>
             )}
             {renderPlayerRow(
               rink.teamA.lead,
-              'red',
+              'teamA',
               'lead',
-              'Lead (Jack Delivery)',
+              !rink.teamA.second && rink.teamA.lead.bowlerNumber < 60
+                ? 'Lead / Partner'
+                : rink.teamA.second
+                ? 'Lead (Jack Delivery)'
+                : 'Lead (Pairs)',
               <Target className="w-3.5 h-3.5 text-emerald-700" />,
               'bg-emerald-100'
             )}
           </div>
         </div>
 
-        {/* Blue Team */}
-        <div className="flex flex-col bg-sky-50/40 rounded-xl p-3 border border-sky-200/70">
-          <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-sky-200/50">
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-sky-600 inline-block shadow-xs"></span>
-              <span className="font-bold text-xs uppercase tracking-wider text-sky-950">
-                Blue Stickers
+        {/* Team B */}
+        <div className="flex flex-col bg-stone-50/70 rounded-xl p-3 border border-stone-200">
+          <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-stone-200">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-stone-600 inline-block"></span>
+              <span className="font-bold text-xs uppercase tracking-wider text-stone-900 font-heading">
+                Team B
               </span>
             </div>
-            <span className="text-[10px] font-semibold bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded border border-sky-200">
-              Team B
-            </span>
           </div>
 
           <div className="space-y-1.5 flex-1">
             {renderPlayerRow(
               rink.teamB.skip,
-              'blue',
+              'teamB',
               'skip',
               'Skip (Captain)',
               <Crown className="w-3.5 h-3.5 text-amber-700" />,
               'bg-amber-100'
             )}
-            {renderPlayerRow(
-              rink.teamB.second,
-              'blue',
-              'second',
-              'Second',
-              <Circle className="w-3.5 h-3.5 text-blue-700" />,
-              'bg-blue-100'
+            {rink.teamB.second ? (
+              renderPlayerRow(
+                rink.teamB.second,
+                'teamB',
+                'second',
+                'Second',
+                <Circle className="w-3.5 h-3.5 text-blue-700" />,
+                'bg-blue-100'
+              )
+            ) : (
+              <div className="flex items-center justify-center p-2 rounded-lg border border-dashed border-stone-300 bg-white/70 text-stone-600 text-xs font-semibold italic">
+                Pairs Match (No Second — 4 Bowls each)
+              </div>
             )}
             {renderPlayerRow(
               rink.teamB.lead,
-              'blue',
+              'teamB',
               'lead',
-              'Lead',
+              !rink.teamB.second && rink.teamB.lead.bowlerNumber < 60
+                ? 'Lead / Partner'
+                : rink.teamB.second
+                ? 'Lead'
+                : 'Lead (Pairs)',
               <Target className="w-3.5 h-3.5 text-emerald-700" />,
               'bg-emerald-100'
             )}

@@ -27,12 +27,18 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
 
   if (!isOpen) return null;
 
-  const rinks = Math.max(1, Math.floor(playerCount / 6));
-  const countPerRole = rinks * 2;
+  const rinks = Math.max(1, Math.ceil(playerCount / 6));
+  const rem = playerCount % 6;
+  const isSmall6nMinus4 = playerCount < 20 && rem === 2;
+  const secondsRemoved = isSmall6nMinus4 ? 2 : rem === 4 ? 2 : rem === 2 ? 4 : 0;
+  const leadsRemoved = isSmall6nMinus4 ? 2 : 0;
+  const numSkips = rinks * 2;
+  const numSeconds = Math.max(0, rinks * 2 - secondsRemoved);
+  const numLeads = Math.max(0, rinks * 2 - leadsRemoved);
 
-  const skips = players.filter(p => p.position === 'skip' || (p.bowlerNumber >= 1 && p.bowlerNumber < 30)).slice(0, countPerRole);
-  const seconds = players.filter(p => p.position === 'second' || (p.bowlerNumber >= 30 && p.bowlerNumber < 60)).slice(0, countPerRole);
-  const leads = players.filter(p => p.position === 'lead' || (p.bowlerNumber >= 60 && p.bowlerNumber < 90)).slice(0, countPerRole);
+  const skips = players.filter(p => p.position === 'skip' || (p.bowlerNumber >= 1 && p.bowlerNumber < 30)).slice(0, numSkips);
+  const seconds = players.filter(p => p.position === 'second' || (p.bowlerNumber >= 30 && p.bowlerNumber < 60)).slice(0, numSeconds);
+  const leads = players.filter(p => p.position === 'lead' || (p.bowlerNumber >= 60 && p.bowlerNumber < 90)).slice(0, numLeads);
 
   const handleNameChange = (id: string, newName: string) => {
     const updated = players.map(p => p.id === id ? { ...p, name: newName } : p);
@@ -49,10 +55,11 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
 
     // Distribute into 3 blocks: Skips (1+), Seconds (30+), Leads (60+)
     const newPlayers: Player[] = [];
+    let lineIdx = 0;
 
-    // First countPerRole are Skips (1+)
-    for (let i = 0; i < countPerRole; i++) {
-      const name = lines[i] || '';
+    // First numSkips are Skips (1+)
+    for (let i = 0; i < numSkips; i++) {
+      const name = lines[lineIdx++] || '';
       newPlayers.push({
         id: `skip-${1 + i}`,
         name,
@@ -62,9 +69,9 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
       });
     }
 
-    // Next countPerRole are Seconds (30+)
-    for (let i = 0; i < countPerRole; i++) {
-      const name = lines[countPerRole + i] || '';
+    // Next numSeconds are Seconds (30+)
+    for (let i = 0; i < numSeconds; i++) {
+      const name = lines[lineIdx++] || '';
       newPlayers.push({
         id: `second-${30 + i}`,
         name,
@@ -74,9 +81,9 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
       });
     }
 
-    // Next countPerRole are Leads (60+)
-    for (let i = 0; i < countPerRole; i++) {
-      const name = lines[countPerRole * 2 + i] || '';
+    // Next numLeads are Leads (60+)
+    for (let i = 0; i < numLeads; i++) {
+      const name = lines[lineIdx++] || '';
       newPlayers.push({
         id: `lead-${60 + i}`,
         name,
@@ -115,7 +122,7 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
             </span>
           </div>
           <span className="text-xs font-semibold text-stone-500">
-            {list.length} Bowlers ({list.length / 2} Rinks)
+            {list.length} Bowlers
           </span>
         </div>
 
@@ -310,9 +317,13 @@ export const PlayerListModal: React.FC<PlayerListModalProps> = ({
                 </label>
                 <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl mb-3 text-xs text-amber-900 space-y-1">
                   <p className="font-bold">Position Block Order:</p>
-                  <p>• First {countPerRole} names → <strong>Skips (#1 to #{countPerRole})</strong></p>
-                  <p>• Next {countPerRole} names → <strong>Seconds (#30 to #{29 + countPerRole})</strong></p>
-                  <p>• Next {countPerRole} names → <strong>Leads (#60 to #{59 + countPerRole})</strong></p>
+                  <p>• First {numSkips} names → <strong>Skips (#1 to #{numSkips})</strong></p>
+                  {numSeconds > 0 ? (
+                    <p>• Next {numSeconds} names → <strong>Seconds (#30 to #{29 + numSeconds})</strong> {secondsRemoved > 0 ? `(-${secondsRemoved} removed)` : ''}</p>
+                  ) : (
+                    <p>• <strong>Seconds: None</strong> (Pairs format)</p>
+                  )}
+                  <p>• Next {numLeads} names → <strong>Leads (#60 to #{59 + numLeads})</strong> {leadsRemoved > 0 ? `(-${leadsRemoved} removed)` : ''}</p>
                 </div>
                 <textarea
                   rows={10}

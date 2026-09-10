@@ -11,9 +11,9 @@ export interface Player {
 export interface Team {
   id: string;
   name: string;
-  color: 'red' | 'blue' | 'yellow' | 'green';
+  color?: string;
   lead: Player;
-  second: Player;
+  second?: Player | null;
   skip: Player;
 }
 

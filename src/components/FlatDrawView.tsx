@@ -15,7 +15,7 @@ interface FlatDrawViewProps {
 interface PlayerMatchInfo {
   roundNumber: number;
   rinkNumber: number;
-  teamColor: 'Red' | 'Blue';
+  teamSide: 'Team A' | 'Team B';
   teamNumbers: number[];
   oppositionNumbers: number[];
 }
@@ -45,22 +45,22 @@ export const FlatDrawView: React.FC<FlatDrawViewProps> = ({
     return sorted.map((player) => {
       const matches: PlayerMatchInfo[] = tournament.rounds.map((round) => {
         let rinkNumber = 1;
-        let teamColor: 'Red' | 'Blue' = 'Red';
+        let teamSide: 'Team A' | 'Team B' = 'Team A';
         let teamNumbers: number[] = [];
         let oppositionNumbers: number[] = [];
 
         round.rinks.forEach((r) => {
-          const teamA = [r.teamA.skip, r.teamA.second, r.teamA.lead];
-          const teamB = [r.teamB.skip, r.teamB.second, r.teamB.lead];
+          const teamA = [r.teamA.skip, r.teamA.second, r.teamA.lead].filter((p): p is Player => Boolean(p));
+          const teamB = [r.teamB.skip, r.teamB.second, r.teamB.lead].filter((p): p is Player => Boolean(p));
 
           if (teamA.some((p) => p.bowlerNumber === player.bowlerNumber)) {
             rinkNumber = r.rinkNumber;
-            teamColor = 'Red';
+            teamSide = 'Team A';
             teamNumbers = teamA.map((p) => p.bowlerNumber).sort((a, b) => a - b);
             oppositionNumbers = teamB.map((p) => p.bowlerNumber).sort((a, b) => a - b);
           } else if (teamB.some((p) => p.bowlerNumber === player.bowlerNumber)) {
             rinkNumber = r.rinkNumber;
-            teamColor = 'Blue';
+            teamSide = 'Team B';
             teamNumbers = teamB.map((p) => p.bowlerNumber).sort((a, b) => a - b);
             oppositionNumbers = teamA.map((p) => p.bowlerNumber).sort((a, b) => a - b);
           }
@@ -69,7 +69,7 @@ export const FlatDrawView: React.FC<FlatDrawViewProps> = ({
         return {
           roundNumber: round.roundNumber,
           rinkNumber,
-          teamColor,
+          teamSide,
           teamNumbers,
           oppositionNumbers
         };
@@ -322,19 +322,13 @@ export const FlatDrawView: React.FC<FlatDrawViewProps> = ({
                           className="py-3.5 px-4 align-top border-l border-stone-200"
                         >
                           <div className="space-y-2">
-                            {/* Round and Rink Header (Replaces Match 1 (Round 1): Rink 4 (Red) with Round 1. Rink 4) */}
+                            {/* Round and Rink Header */}
                             <div className="flex items-center justify-between gap-2">
                               <span className="inline-flex items-center px-2.5 py-1 rounded-md font-black text-xs bg-stone-800 text-white tracking-wide">
                                 Round {m.roundNumber}. Rink {calculatedRink}
                               </span>
-                            <span
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                m.teamColor === 'Red'
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                  : 'bg-blue-100 text-blue-800 border border-blue-200'
-                              }`}
-                            >
-                              {m.teamColor} Team
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-stone-100 text-stone-700 border border-stone-200">
+                              {m.teamSide}
                             </span>
                           </div>
 

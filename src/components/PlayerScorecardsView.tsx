@@ -37,7 +37,7 @@ interface MatchRowData {
   roundNumber: number;
   rinkNumber: number;
   rinkFormula: string; // =startrink-1+X
-  teamColor: 'Red' | 'Blue';
+  teamSide: 'Team A' | 'Team B';
   teamNumbers: number[];
   oppositionNumbers: number[];
 }
@@ -331,22 +331,22 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
 
       const matches: MatchRowData[] = tournament.rounds.map((round) => {
         let rinkNumber = 1;
-        let teamColor: 'Red' | 'Blue' = 'Red';
+        let teamSide: 'Team A' | 'Team B' = 'Team A';
         let teamNumbers: number[] = [];
         let oppositionNumbers: number[] = [];
 
         round.rinks.forEach((r) => {
-          const teamA = [r.teamA.skip, r.teamA.second, r.teamA.lead];
-          const teamB = [r.teamB.skip, r.teamB.second, r.teamB.lead];
+          const teamA = [r.teamA.skip, r.teamA.second, r.teamA.lead].filter((p): p is Player => Boolean(p));
+          const teamB = [r.teamB.skip, r.teamB.second, r.teamB.lead].filter((p): p is Player => Boolean(p));
 
           if (teamA.some((p) => p.bowlerNumber === player.bowlerNumber)) {
             rinkNumber = r.rinkNumber;
-            teamColor = 'Red';
+            teamSide = 'Team A';
             teamNumbers = teamA.map((p) => p.bowlerNumber).sort((a, b) => a - b);
             oppositionNumbers = teamB.map((p) => p.bowlerNumber).sort((a, b) => a - b);
           } else if (teamB.some((p) => p.bowlerNumber === player.bowlerNumber)) {
             rinkNumber = r.rinkNumber;
-            teamColor = 'Blue';
+            teamSide = 'Team B';
             teamNumbers = teamB.map((p) => p.bowlerNumber).sort((a, b) => a - b);
             oppositionNumbers = teamA.map((p) => p.bowlerNumber).sort((a, b) => a - b);
           }
@@ -357,7 +357,7 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
           rinkNumber,
           // Precede all numeric rink values with the dynamic text prefix =startrink-1+
           rinkFormula: `=startrink-1+${rinkNumber}`,
-          teamColor,
+          teamSide,
           teamNumbers,
           oppositionNumbers
         };
@@ -621,18 +621,30 @@ export const PlayerScorecardsView: React.FC<PlayerScorecardsViewProps> = ({
     }
 
     @media print {
-      body {
-        margin: 0;
-        padding: 0;
-        background: #ffffff;
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
       }
       .scorecard-landscape-page {
-        width: 100%;
-        height: 192mm;
-        max-height: 192mm;
-        margin: 1mm auto;
-        padding: 0;
-        box-shadow: none;
+        width: 281mm !important;
+        height: 194mm !important;
+        max-width: 281mm !important;
+        max-height: 194mm !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        column-gap: 8mm !important;
+        row-gap: 8mm !important;
+      }
+      .scorecard-card,
+      .scorecard-card * {
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        box-shadow: none !important;
       }
     }
 

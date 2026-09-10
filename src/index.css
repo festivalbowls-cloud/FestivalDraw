@@ -21,11 +21,15 @@
     size: landscape;
     margin: 8mm;
   }
-  body {
-    background-color: white !important;
-    color: black !important;
+  html, body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .no-print {
     display: none !important;
@@ -41,19 +45,35 @@
   .scorecard-landscape-page {
     page-break-after: always;
     break-after: page;
-    width: 100%;
-    height: 100vh;
-    max-height: 194mm;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    width: 281mm !important;
+    height: 194mm !important;
+    max-width: 281mm !important;
+    max-height: 194mm !important;
     box-sizing: border-box;
     margin: 0 auto !important;
     padding: 0 !important;
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     grid-template-rows: 1fr 1fr !important;
-    gap: 8mm !important;
+    column-gap: 8mm !important;
+    row-gap: 8mm !important;
   }
   .scorecard-landscape-page:last-child {
     page-break-after: auto;
     break-after: auto;
+  }
+  /* Remove any shading on scorecards: pure clean white and crisp black borders */
+  .scorecard-card,
+  .scorecard-card thead,
+  .scorecard-card tbody,
+  .scorecard-card tr,
+  .scorecard-card th,
+  .scorecard-card td,
+  .scorecard-card div {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
   }
 }
